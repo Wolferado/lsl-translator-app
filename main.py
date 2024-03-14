@@ -19,7 +19,7 @@ with mp_hands.Hands(min_detection_confidence=0.9, min_tracking_confidence=0.5, m
 
         hand_results = hands.process(image) 
         face_results = face_mesh.process(image)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
         mp_drawing = mp.solutions.drawing_utils # Enabling drawing utilities from MediaPipe library
         mp_drawing_styles = mp.solutions.drawing_styles
@@ -47,8 +47,8 @@ with mp_hands.Hands(min_detection_confidence=0.9, min_tracking_confidence=0.5, m
                     landmark_drawing_spec = mp_drawing.DrawingSpec(color=(0, 0, 0), thickness=2, circle_radius=2), # Customize landmarks
                     connection_drawing_spec = mp_drawing.DrawingSpec(color=(255, 0, 255), thickness=2, circle_radius=2) # Customize connections
                 ) 
-            for hand in hand_results.multi_handedness:
-                print(hand.classification[0].label)
+            #for hand in hand_results.multi_handedness:
+                #print(hand.classification[0].label)
 
         # Open a window with the app
         cv2.imshow('Latvian Sign Language Detection App', image)
