@@ -1,6 +1,6 @@
 import flet as ft
 
-class Home(ft.UserControl):
+class HomeScreen(ft.UserControl):
     def build(self):
         self.app_title = ft.Container(
             content=ft.Text('Latvian Sign Language Recognition App', text_align=ft.TextAlign.CENTER, size=32), 
