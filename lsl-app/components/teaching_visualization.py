@@ -12,9 +12,11 @@ mp_drawing = mp.solutions.drawing_utils # Enabling drawing utilities from MediaP
 mp_drawing_styles = mp.solutions.drawing_styles
 
 class TeachingVisualization(ft.UserControl):
-    def _init_(self, learning_directory, saving_directory):
+    def _init_(self, learning_directory, saving_directory, flip_file, create_new_folders):
         self.learning_directory = learning_directory
         self.saving_directory = saving_directory
+        self.flip_file = flip_file
+        self.create_new_folders = create_new_folders
 
     def build(self):
         self.image = ft.Image()
@@ -91,87 +93,91 @@ class TeachingVisualization(ft.UserControl):
 
     # Method to detect hands and face
     def detectHandsAndFace(self):
+        current_file_num = 0
+        total_file_amount = 0
+
+        for file in os.scandir(self.learning_directory):
+            if file.is_file():
+                total_file_amount += 1
+
         for file in os.listdir(self.learning_directory):
+            current_file_num += 1
+
             filePath = "{}/{}".format(self.learning_directory, file)
             self.cap = cv2.VideoCapture(filename=filePath)
 
-            dataPath = "{}/{}".format(self.saving_directory, file[:-3])
-            if(os.path.isdir(dataPath) == False):
-                os.mkdir(dataPath)
+            if(self.create_new_folders == True):
+                dataPath = "{}/{}".format(self.saving_directory, file[:-3])
+                if(os.path.isdir(dataPath) == False):
+                    os.mkdir(dataPath)
+            else:
+                dataPath = self.saving_directory
 
             current_frame = 0
 
             # Create a mask for the hands and face
             with mp_hands.Hands(min_detection_confidence=0.9, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.4, max_num_faces=1) as face_mesh:
                 
-                origPath = "{}/{}".format(dataPath, "orig")
-                flipPath = "{}/{}".format(dataPath, "flip")
-
-                if(os.path.isdir(origPath) == False):
-                    os.mkdir(origPath)
-                
-                if(os.path.isdir(flipPath) == False):
-                    os.mkdir(flipPath)
+                while True:
+                    number = 0
+                    orig_path = "{}/{}".format(dataPath, number)
+                    if(os.path.isdir(orig_path) == False):
+                        os.mkdir(orig_path)
+                        break
+                    else:
+                        number += 1
 
                 # Save original video data
-                while self.cap.isOpened():
-                    ret, image = self.cap.read()
-                    image = cv2.flip(image, 1)
-                    cv2.putText(image, "Original Video", (10,30), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0), 2)
-
-                    if ret == False: # If video reached its end
-                        if ret == False:
-                            self.cap = cv2.VideoCapture(filePath)
+                self.loadFile(frame_number=current_frame, file_number=current_file_num, files_amount=total_file_amount, original_video_data_path=orig_path, flipped_video_data_path=None, hands_model=hands, face_mesh_model=face_mesh)
+                
+                if self.flip_file == True:
+                    while True:
+                        number = 0
+                        flip_path = "{}/{}-flip".format(dataPath, number)
+                        if(os.path.isdir(flip_path) == False):
+                            os.mkdir(flip_path)
                             break
                         else:
-                            break
+                            number += 1
+                    
+                    self.cap = cv2.VideoCapture(filename=filePath)
+                    # Save flipped video data
+                    self.loadFile(frame_number=current_frame, file_number=current_file_num, files_amount=total_file_amount, original_video_data_path=None, flipped_video_data_path=flip_path, hands_model=hands, face_mesh_model=face_mesh)
 
-                    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                    hand_results = hands.process(image) 
-                    face_results = face_mesh.process(image)
-                    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-                    if hand_results.multi_hand_landmarks:
-                        data = self.extractResultsLandmarks(hand_results, face_results)
-                        np.save("{}/{}".format(origPath, current_frame), data)
-                        current_frame += 1
+    def loadFile(self, frame_number, file_number, files_amount, original_video_data_path, flipped_video_data_path, hands_model, face_mesh_model):
+        while self.cap.isOpened():
+            ret, image = self.cap.read() # Read file's image (ret - is that a frame or empty file, image - frame data)
 
-                    self.drawLandmarks(image, hand_results, face_results)
+            if flipped_video_data_path: # If video is supposed to be flipped (exists path to save the flipped video)
+                image = cv2.flip(image, 1)
+                cv2.putText(image, "Flipped Video, {} of {}".format(file_number, files_amount), (10,30), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0), 2)
+            elif original_video_data_path: # If video is supposed to be original (exists path to save the original video)
+                cv2.putText(image, "Original Video, {} of {}".format(file_number, files_amount), (10,30), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0), 2)
 
-                    if ret == True: # If video still going
-                        ret, image_arr = cv2.imencode(".png", image)
-                        image_b64 = base64.b64encode(image_arr)
-                        self.image.src_base64 = image_b64.decode("utf-8")
-                        self.image.update()
+            if ret == False: # If video reached its end, leave this loop
+                frame_number = 0
+                break
 
-                # Save flipped video data
-                while self.cap.isOpened():
-                    ret, image = self.cap.read()
-                    cv2.putText(image, "Flipped Video", (10,30), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0), 2)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # Convert image to BGR for better face and hand tracking
+            hand_results = hands_model.process(image) # Get data about hands landmarks
+            face_results = face_mesh_model.process(image) # Get data about face landmarks
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # Convert image to RGB for better appearance
 
-                    if ret == False: # If video reached its end
-                        if ret == False:
-                            self.cap = cv2.VideoCapture(filePath)
-                            break
-                        else:
-                            break
+            if hand_results.multi_hand_landmarks: # If there are hands in the frame detected
+                data = self.extractResultsLandmarks(hand_results, face_results) # Extract data about face and hands landmakrs
+                
+                if original_video_data_path:
+                    np.save("{}/{}".format(original_video_data_path, frame_number), data)
+                elif flipped_video_data_path:
+                    np.save("{}/{}".format(flipped_video_data_path, frame_number), data)           
+                
+                frame_number += 1
 
-                    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                    hand_results = hands.process(image) 
-                    face_results = face_mesh.process(image)
-                    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            self.drawLandmarks(image, hand_results, face_results) # Draw landmarks on visualization
 
-                    if hand_results.multi_hand_landmarks:
-                        data = self.extractResultsLandmarks(hand_results, face_results)
-                        np.save("{}/{}".format(flipPath, current_frame), data)
-                        current_frame += 1
-
-                    self.drawLandmarks(image, hand_results, face_results)
-
-                    if ret == True: # If video still going
-                        ret, image_arr = cv2.imencode(".png", image)
-                        image_b64 = base64.b64encode(image_arr)
-                        self.image.src_base64 = image_b64.decode("utf-8")
-                        self.image.update()
-
-        self.cap.release()
+            if ret == True: # If video still has more frames
+                ret, image_arr = cv2.imencode(".png", image)
+                image_b64 = base64.b64encode(image_arr)
+                self.image.src_base64 = image_b64.decode("utf-8")
+                self.image.update()

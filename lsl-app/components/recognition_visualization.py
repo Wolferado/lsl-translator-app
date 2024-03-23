@@ -15,8 +15,15 @@ mp_drawing_styles = mp.solutions.drawing_styles
 class RecognitionVisualization(ft.UserControl):
     def build(self):
         self.image = ft.Image()
+        self.textField = ft.TextField(
+            label="Text Recognition",
+            value="Awaiting the sign 👋..."
+        )
         self.cap = cv2.VideoCapture(0)
-        return self.image
+        return ft.Column(
+            alignment=ft.alignment.center,
+            controls=[self.image, self.textField]
+        )
     
     def did_mount(self): # Controls appeared on the page
         self.th = threading.Thread(target=self.update_timer, args=(), daemon=True)

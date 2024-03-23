@@ -4,3 +4,11 @@ Notes.md
 /videos_alphabet
 # Sign data (both alphabet and other in the future)
 /sign_data
+# Environment variables
+.env
+# TensorFlow logs
+/logs
+# PyCache files
+/lsl-app/components/__pycache__
+# .h5 models (for development stage)
+*.h5

@@ -4,6 +4,12 @@ from components.recognition_visualization import RecognitionVisualization
 
 class RecognitionScreen(ft.UserControl):
     def build(self):
+        self.app_title = ft.Container(
+            content=ft.Text('Recognition', text_align=ft.TextAlign.CENTER, size=32), 
+            padding=10, 
+            alignment=ft.alignment.center
+        )
+
         self.start_recognition_btn = ft.ElevatedButton(
             text="Start Recognition",
             icon=ft.icons.FACE_UNLOCK_ROUNDED,
@@ -24,7 +30,9 @@ class RecognitionScreen(ft.UserControl):
         self.recognition_placeholder = ft.Column()
 
         return ft.Column(
+            alignment=ft.MainAxisAlignment.CENTER,
             controls=[
+                self.app_title,
                 self.start_recognition_btn,
                 self.stop_teach_btn,
                 self.recognition_placeholder
