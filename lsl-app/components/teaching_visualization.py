@@ -118,22 +118,22 @@ class TeachingVisualization(ft.UserControl):
             # Create a mask for the hands and face
             with mp_hands.Hands(min_detection_confidence=0.9, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.4, max_num_faces=1) as face_mesh:
                 
+                number = 0
                 while True:
-                    number = 0
                     orig_path = "{}/{}".format(dataPath, number)
                     if(os.path.isdir(orig_path) == False):
                         os.mkdir(orig_path)
                         break
-                    else:
+                    elif (os.path.isdir(orig_path)):
                         number += 1
 
                 # Save original video data
                 self.loadFile(frame_number=current_frame, file_number=current_file_num, files_amount=total_file_amount, original_video_data_path=orig_path, flipped_video_data_path=None, hands_model=hands, face_mesh_model=face_mesh)
                 
+                number = 0
                 if self.flip_file == True:
                     while True:
-                        number = 0
-                        flip_path = "{}/{}-flip".format(dataPath, number)
+                        flip_path = "{}/{}".format(dataPath, number)
                         if(os.path.isdir(flip_path) == False):
                             os.mkdir(flip_path)
                             break
@@ -143,7 +143,6 @@ class TeachingVisualization(ft.UserControl):
                     self.cap = cv2.VideoCapture(filename=filePath)
                     # Save flipped video data
                     self.loadFile(frame_number=current_frame, file_number=current_file_num, files_amount=total_file_amount, original_video_data_path=None, flipped_video_data_path=flip_path, hands_model=hands, face_mesh_model=face_mesh)
-
 
     def loadFile(self, frame_number, file_number, files_amount, original_video_data_path, flipped_video_data_path, hands_model, face_mesh_model):
         while self.cap.isOpened():

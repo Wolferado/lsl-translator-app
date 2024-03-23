@@ -1,14 +1,14 @@
 # Notes regarding development
 Notes.md
 # Videos for alphabet learning
-/videos_alphabet
+/signs_*
 # Sign data (both alphabet and other in the future)
-/sign_data
+/sign_data*
 # Environment variables
 .env
 # TensorFlow logs
 /logs
 # PyCache files
 /lsl-app/components/__pycache__
-# .h5 models (for development stage)
-*.h5
+# Models (for development stage)
+/models

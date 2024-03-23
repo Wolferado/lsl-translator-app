@@ -81,7 +81,7 @@ class TeachingScreen(ft.UserControl):
         self.show_hide_teach_btn()
 
         if self.learning_directory:
-            self.select_learning_directory_btn.text = "Learning directory selected: ...\\{}".format(self.learning_directory.rsplit('\\', 1)[1])
+            self.select_learning_directory_btn.text = "Learning directory selected: ...\\{}\\{}".format(self.learning_directory.rsplit('\\', 2)[-2], self.learning_directory.rsplit('\\', 2)[-1])
         else:
             self.select_learning_directory_btn.text = "Select directory to learn from"
 
@@ -92,7 +92,7 @@ class TeachingScreen(ft.UserControl):
         self.show_hide_teach_btn()
 
         if self.saving_directory:
-            self.select_saving_directory_btn.text = "Saving directory selected: ...\\{}".format(self.saving_directory.rsplit('\\', 1)[1])
+            self.select_saving_directory_btn.text = "Saving directory selected: ...\\{}\\{}".format(self.saving_directory.rsplit('\\', 2)[-2], self.saving_directory.rsplit('\\', 2)[-1])
         else:
             self.select_saving_directory_btn.text = "Select data saving directory"
 
