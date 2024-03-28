@@ -21,6 +21,8 @@ class TeachingVisualization(ft.UserControl):
     def build(self):
         self.image = ft.Image()
         self.cap = None
+        self.left_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
+        self.right_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
         return self.image
 
     def did_mount(self):
@@ -31,11 +33,11 @@ class TeachingVisualization(ft.UserControl):
         self.th.join()
 
     def update_timer(self):
-        self.detectHandsAndFace()
+        self.detect_hands_and_face()
 
     # Method to draw landmarks on face and hands.
     # Parse image (frame) and processed hands and face results
-    def drawLandmarks(self, image, hand_results, face_results):
+    def draw_landmarks(self, image, hand_results, face_results):
         # Draw face landmarks, if any
         if face_results.multi_face_landmarks:
             for face in face_results.multi_face_landmarks:
@@ -60,39 +62,87 @@ class TeachingVisualization(ft.UserControl):
 
     # Method to concatenate hands and face landmarks.
     # Parse both results variables.
-    def extractResultsLandmarks(self, hand_results, face_results):
+    def extract_results_landmarks(self, hand_results, face_results):
+        left_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(18), 5)]) # Array of right hand landmarks and tracing landmarks
+        right_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(18), 5)]) # Array of right hand landmarks and tracing landmarks
         face_points_pos = np.zeros(1404)
-        left_hand_points_pos = np.zeros(63)
-        right_hand_points_pos = np.zeros(63)
+        tracing_points_index = [0, 4, 8, 12, 16, 20] # Six points (wrist, thumb_tip, index_finger_tip, middle_finger_tip, ring_finger_tip, pinky_tip)
+
+        self.right_hand_visible = False
+        self.left_hand_visible = False
 
         # If face detected
         if face_results.multi_face_landmarks:
             face_points_pos = np.array([[point.x, point.y, point.z] for point in face_results.multi_face_landmarks[0].landmark]).flatten()
 
-        # If hands detected
+        # If hands got detected
         # Note: Classification labels are set completely opposite, because in video they recognize it that way 
         if hand_results.multi_hand_landmarks:
+            # Set boolean variables based on showed hands
             for hand in hand_results.multi_handedness:
-                if hand.classification[0].label == "Right": # Left hand
-                    left_hand_points_pos = np.array([[point.x, point.y, point.z] for point in hand_results.multi_hand_landmarks[0].landmark]).flatten()
-                if hand.classification[0].label == "Left": # Right hand
-                    right_hand_points_pos = np.array([[point.x, point.y, point.z] for point in hand_results.multi_hand_landmarks[0].landmark]).flatten()
+                if(hand.classification[0].label == "Left"): 
+                    self.right_hand_visible = True
+                if(hand.classification[0].label == "Right"): 
+                    self.left_hand_visible = True
 
-        ''' # For testing purposes
-        print("Face")
-        print(face_points_pos)
-        print("Left")
-        if left_hand_points_pos.all() != 0:
-            print(left_hand_points_pos)
-        print("Right")
-        if right_hand_points_pos.all() != 0:
-            print(right_hand_points_pos)
-        '''
+            # If left hand got detected
+            if(self.left_hand_visible == True):
+                tracing_points = []
+
+                # For each index in the array of needed indexes
+                for idx in tracing_points_index: 
+                    # Get X, Y, Z coords about the indexed landmark and add them to the array.
+                    landmark = hand_results.multi_hand_landmarks[0].landmark[idx]
+                    tracing_points.append([landmark.x, landmark.y, landmark.z])
+
+                # Replace created array with NumPy array and make it 1D.
+                tracing_points = np.array(tracing_points).flatten()
+
+                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) # Shift array to the right by one place
+                self.left_hand_tracing_points_pos[:18] = tracing_points # Replace first element (that came from the end of the array) with a new one
+                landmarks_points = np.array([[point.x, point.y, point.z] for point in hand_results.multi_hand_landmarks[0].landmark]).flatten() # Get all landmarks points and make them 1D
+                left_hand_points_pos = np.concatenate([landmarks_points, self.left_hand_tracing_points_pos]) # Combine both landmarks' and tracing arrays.
+            elif(self.left_hand_visible == False):
+                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) # Shift array to the right by one place
+                self.left_hand_tracing_points_pos[:18] = np.zeros(18) # Replace first element (that came from the end of the array) with a new one
+                left_hand_points_pos = np.concatenate([np.zeros(63), self.left_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
+
+            # If right hand got detected
+            if(self.right_hand_visible == True):
+                tracing_points = []
+                
+                # For each index in the array of needed indexes
+                for idx in tracing_points_index:
+                    # Get X, Y, Z coords about the indexed landmark
+                    landmark = hand_results.multi_hand_landmarks[0].landmark[idx]
+                    tracing_points.append([landmark.x, landmark.y, landmark.z])
+
+                # Replace created array with NumPy array and make it 1D.
+                tracing_points = np.array(tracing_points).flatten()
+
+                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) # Shift array to the right by one place
+                self.right_hand_tracing_points_pos[:18] = tracing_points # Replace first element (that came from the end of the array) with a new one
+                landmarks_points = np.array([[point.x, point.y, point.z] for point in hand_results.multi_hand_landmarks[0].landmark]).flatten() # Get all landmarks points and make them 1D
+                right_hand_points_pos = np.concatenate([landmarks_points, self.right_hand_tracing_points_pos]) # Combine both landmarks' and tracing arrays.
+            
+            elif(self.right_hand_visible == False):
+                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) # Shift array to the right by one place
+                self.right_hand_tracing_points_pos[:18] = np.zeros(18) # Replace first element (that came from the end of the array) with a new one
+                right_hand_points_pos = np.concatenate([np.zeros(63), self.right_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
+
+        else:
+            self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) # Shift array to the right by one place
+            self.left_hand_tracing_points_pos[:18] = np.zeros(18) # Replace first element (that came from the end of the array) with a new one
+            left_hand_points_pos = np.concatenate([np.zeros(63), self.left_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
+
+            self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) # Shift array to the right by one place
+            self.right_hand_tracing_points_pos[:18] = np.zeros(18) # Replace first element (that came from the end of the array) with a new one
+            right_hand_points_pos = np.concatenate([np.zeros(63), self.right_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
 
         return np.concatenate([face_points_pos, left_hand_points_pos, right_hand_points_pos])
 
     # Method to detect hands and face
-    def detectHandsAndFace(self):
+    def detect_hands_and_face(self):
         current_file_num = 0
         total_file_amount = 0
 
@@ -103,8 +153,8 @@ class TeachingVisualization(ft.UserControl):
         for file in os.listdir(self.learning_directory):
             current_file_num += 1
 
-            filePath = "{}/{}".format(self.learning_directory, file)
-            self.cap = cv2.VideoCapture(filename=filePath)
+            file_path = "{}/{}".format(self.learning_directory, file)
+            self.cap = cv2.VideoCapture(filename=file_path)
 
             if(self.create_new_folders == True):
                 dataPath = "{}/{}".format(self.saving_directory, file[:-3])
@@ -128,7 +178,7 @@ class TeachingVisualization(ft.UserControl):
                         number += 1
 
                 # Save original video data
-                self.loadFile(frame_number=current_frame, file_number=current_file_num, files_amount=total_file_amount, original_video_data_path=orig_path, flipped_video_data_path=None, hands_model=hands, face_mesh_model=face_mesh)
+                self.load_file(frame_number=current_frame, file_number=current_file_num, files_amount=total_file_amount, original_video_data_path=orig_path, flipped_video_data_path=None, hands_model=hands, face_mesh_model=face_mesh)
                 
                 number = 0
                 if self.flip_file == True:
@@ -140,11 +190,11 @@ class TeachingVisualization(ft.UserControl):
                         else:
                             number += 1
                     
-                    self.cap = cv2.VideoCapture(filename=filePath)
+                    self.cap = cv2.VideoCapture(filename=file_path)
                     # Save flipped video data
-                    self.loadFile(frame_number=current_frame, file_number=current_file_num, files_amount=total_file_amount, original_video_data_path=None, flipped_video_data_path=flip_path, hands_model=hands, face_mesh_model=face_mesh)
+                    self.load_file(frame_number=current_frame, file_number=current_file_num, files_amount=total_file_amount, original_video_data_path=None, flipped_video_data_path=flip_path, hands_model=hands, face_mesh_model=face_mesh)
 
-    def loadFile(self, frame_number, file_number, files_amount, original_video_data_path, flipped_video_data_path, hands_model, face_mesh_model):
+    def load_file(self, frame_number, file_number, files_amount, original_video_data_path, flipped_video_data_path, hands_model, face_mesh_model):
         while self.cap.isOpened():
             ret, image = self.cap.read() # Read file's image (ret - is that a frame or empty file, image - frame data)
 
@@ -163,9 +213,10 @@ class TeachingVisualization(ft.UserControl):
             face_results = face_mesh_model.process(image) # Get data about face landmarks
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # Convert image to RGB for better appearance
 
+            data = self.extract_results_landmarks(hand_results, face_results) # Extract data about face and hands landmakrs
+
             if hand_results.multi_hand_landmarks: # If there are hands in the frame detected
-                data = self.extractResultsLandmarks(hand_results, face_results) # Extract data about face and hands landmakrs
-                
+            
                 if original_video_data_path:
                     np.save("{}/{}".format(original_video_data_path, frame_number), data)
                 elif flipped_video_data_path:
@@ -173,7 +224,7 @@ class TeachingVisualization(ft.UserControl):
                 
                 frame_number += 1
 
-            self.drawLandmarks(image, hand_results, face_results) # Draw landmarks on visualization
+            self.draw_landmarks(image, hand_results, face_results) # Draw landmarks on visualization
 
             if ret == True: # If video still has more frames
                 ret, image_arr = cv2.imencode(".png", image)
