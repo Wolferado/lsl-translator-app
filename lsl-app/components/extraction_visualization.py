@@ -11,15 +11,17 @@ mp_face_mesh = mp.solutions.face_mesh # Load the solution from mediapipe library
 mp_drawing = mp.solutions.drawing_utils # Enabling drawing utilities from MediaPipe library
 mp_drawing_styles = mp.solutions.drawing_styles
 
-class TeachingVisualization(ft.UserControl):
-    def _init_(self, learning_directory, saving_directory, flip_file, create_new_folders):
-        self.learning_directory = learning_directory
+class ExtractionVisualization(ft.UserControl):
+    def _init_(self, extraction_directory, saving_directory, flip_file, create_new_folders):
+        self.extraction_directory = extraction_directory
         self.saving_directory = saving_directory
         self.flip_file = flip_file
         self.create_new_folders = create_new_folders
 
     def build(self):
         self.image = ft.Image()
+        self.image.width = 420
+        self.image.height = 280
         self.cap = None
         self.left_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
         self.right_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
@@ -146,14 +148,14 @@ class TeachingVisualization(ft.UserControl):
         current_file_num = 0
         total_file_amount = 0
 
-        for file in os.scandir(self.learning_directory):
+        for file in os.scandir(self.extraction_directory):
             if file.is_file():
                 total_file_amount += 1
 
-        for file in os.listdir(self.learning_directory):
+        for file in os.listdir(self.extraction_directory):
             current_file_num += 1
 
-            file_path = "{}/{}".format(self.learning_directory, file)
+            file_path = "{}/{}".format(self.extraction_directory, file)
             self.cap = cv2.VideoCapture(filename=file_path)
 
             if(self.create_new_folders == True):
@@ -198,15 +200,17 @@ class TeachingVisualization(ft.UserControl):
         while self.cap.isOpened():
             ret, image = self.cap.read() # Read file's image (ret - is that a frame or empty file, image - frame data)
 
+            if ret == False: # If video reached its end, leave this loop
+                frame_number = 0
+                break
+
+            image = cv2.resize(image, (640, 480), interpolation = cv2.INTER_AREA)
+
             if flipped_video_data_path: # If video is supposed to be flipped (exists path to save the flipped video)
                 image = cv2.flip(image, 1)
                 cv2.putText(image, "Flipped Video, {} of {}".format(file_number, files_amount), (10,30), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0), 2)
             elif original_video_data_path: # If video is supposed to be original (exists path to save the original video)
                 cv2.putText(image, "Original Video, {} of {}".format(file_number, files_amount), (10,30), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0), 2)
-
-            if ret == False: # If video reached its end, leave this loop
-                frame_number = 0
-                break
 
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # Convert image to BGR for better face and hand tracking
             hand_results = hands_model.process(image) # Get data about hands landmarks

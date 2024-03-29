@@ -18,11 +18,8 @@ class RecognitionScreen(ft.UserControl):
         )
         
         self.stop_teach_btn = ft.ElevatedButton(
-            bgcolor="770409",
             text="Stop Recognition",
-            color="#ff0000",
-            icon=ft.icons.FACE_ROUNDED,
-            icon_color="#ff0000",
+            icon=ft.icons.FACE_RETOUCHING_OFF,
             visible=False,
             on_click=self.stop_recognition
         )
@@ -41,8 +38,13 @@ class RecognitionScreen(ft.UserControl):
 
     def start_recognition(self, e):
         self.start_recognition_btn.text = "Loading..."
+        self.recognition_placeholder.controls.append(ft.Container(
+            content=ft.ProgressRing(),
+            alignment=ft.alignment.center)
+        )
         self.update()
 
+        self.recognition_placeholder.controls.clear()
         self.start_recognition_btn.visible = False
         self.stop_teach_btn.visible = True
 

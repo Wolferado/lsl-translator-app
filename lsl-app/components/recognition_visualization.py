@@ -51,8 +51,6 @@ class RecognitionVisualization(ft.UserControl):
         with mp_hands.Hands(min_detection_confidence=0.9, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.5, max_num_faces=1) as face_mesh:
             while self.cap.isOpened():
                 ret, image = self.cap.read()
-            
-                # if ret == False: return # Stops errors, don't know how crucial, only warns
                  
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 image = cv2.flip(image, 1) # Flip the stream
@@ -61,7 +59,8 @@ class RecognitionVisualization(ft.UserControl):
                 face_results = face_mesh.process(image)
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-                self.process_and_draw_landmarks(image, hand_results, face_results)
+                #self.draw_landmarks(image, hand_results, face_results)
+                self.process_landmarks(image, hand_results, face_results)
 
                 # Open a window with the app
                 ret, image_arr = cv2.imencode(".png", image)
@@ -69,20 +68,12 @@ class RecognitionVisualization(ft.UserControl):
                 self.image.src_base64 = image_b64.decode("utf-8")
                 self.image.update()
         
-    # Method to draw landmarks on face and hands.
+    # Method to process landmarks on face and hands and to change status icons.
     # Parse image (frame) and processed hands and face results
-    def process_and_draw_landmarks(self, image, hand_results, face_results):
+    def process_landmarks(self, image, hand_results, face_results):
         # Draw face landmarks, if any
         if face_results.multi_face_landmarks:
-            for face in face_results.multi_face_landmarks:
-                self.face_detected_icon.color = ft.colors.GREEN_ACCENT_700 # Set icon color to green
-                mp_drawing.draw_landmarks(
-                    image = image,
-                    landmark_list = face,
-                    connections = mp_face_mesh.FACEMESH_CONTOURS,
-                    landmark_drawing_spec = mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=1, circle_radius=1),
-                    connection_drawing_spec = mp_drawing_styles.DrawingSpec(color=(0, 0, 255), thickness=1, circle_radius=1)
-                )
+            self.face_detected_icon.color = ft.colors.GREEN_ACCENT_700 # Set icon color to green
         else:
             self.face_detected_icon.color = ft.colors.GREY
 
@@ -99,16 +90,6 @@ class RecognitionVisualization(ft.UserControl):
                 if(hand.classification[0].label == "Right"): 
                     self.right_hand_visible = True
 
-            # For each hand in the frame, draw landamrks
-            for hand in hand_results.multi_hand_landmarks:
-                mp_drawing.draw_landmarks(
-                    image = image, 
-                    landmark_list = hand, 
-                    connections = mp_hands.HAND_CONNECTIONS, # Draw landmarks and their connections based on image, hand shown 
-                    landmark_drawing_spec = mp_drawing.DrawingSpec(color=(0, 0, 0), thickness=2, circle_radius=2), # Customize landmarks
-                    connection_drawing_spec = mp_drawing.DrawingSpec(color=(255, 0, 255), thickness=2, circle_radius=2) # Customize connections
-                ) 
-
             if(self.left_hand_visible == True):
                 self.left_hand_detected_icon.color = ft.colors.GREEN_ACCENT_700
             else:
@@ -118,6 +99,7 @@ class RecognitionVisualization(ft.UserControl):
                 self.right_hand_detected_icon.color = ft.colors.GREEN_ACCENT_700
             else:
                 self.right_hand_detected_icon.color = ft.colors.GREY
+
         else:
             self.left_hand_detected_icon.color = ft.colors.GREY
             self.right_hand_detected_icon.color = ft.colors.GREY
@@ -125,5 +107,30 @@ class RecognitionVisualization(ft.UserControl):
             self.right_hand_visible = False
 
         self.icon_row.update()
+
+    def draw_landmarks(self, image, hand_results, face_results):
+        # Draw face landmarks, if any
+        if face_results.multi_face_landmarks:
+            for face in face_results.multi_face_landmarks:
+                self.face_detected_icon.color = ft.colors.GREEN_ACCENT_700 # Set icon color to green
+                mp_drawing.draw_landmarks(
+                    image = image,
+                    landmark_list = face,
+                    connections = mp_face_mesh.FACEMESH_CONTOURS,
+                    landmark_drawing_spec = mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=1, circle_radius=1),
+                    connection_drawing_spec = mp_drawing_styles.DrawingSpec(color=(0, 0, 255), thickness=1, circle_radius=1)
+                )
+
+        # Draw hand landmarks, if any
+        if hand_results.multi_hand_landmarks:
+            # For each hand in the frame, draw landamrks
+            for hand in hand_results.multi_hand_landmarks:
+                mp_drawing.draw_landmarks(
+                    image = image, 
+                    landmark_list = hand, 
+                    connections = mp_hands.HAND_CONNECTIONS, # Draw landmarks and their connections based on image, hand shown 
+                    landmark_drawing_spec = mp_drawing.DrawingSpec(color=(0, 0, 0), thickness=2, circle_radius=2), # Customize landmarks
+                    connection_drawing_spec = mp_drawing.DrawingSpec(color=(255, 0, 255), thickness=2, circle_radius=2) # Customize connections
+                ) 
 
     
