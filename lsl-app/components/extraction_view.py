@@ -31,9 +31,9 @@ class ExtractionScreen(ft.UserControl):
         )
 
         self.checkbox_create_new_folder = ft.Checkbox(
-            label="Create new folder for each file", 
+            label="Create new folder for each sign", 
             value=True, 
-            tooltip="Set to True, if you wish to create new data folders for each video.",
+            tooltip="Creates new folder for each subfolder in the selected directory in saving directory. Disable, if you wish to only add data to existing directory.",
             on_change=self.toggle_create_new_folders_bool
         )
 

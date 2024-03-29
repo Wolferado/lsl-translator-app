@@ -111,7 +111,7 @@ class RecordingScreen(ft.UserControl):
     def take_picture(self, e):
         print("Picture taken")
 
-        cv2.imwrite("{}/{}.png".format(self.saving_directory, self.count_files()), self.original_image)
+        cv2.imwrite("{}/{}.jpg".format(self.saving_directory, self.count_files()), self.original_image)
 
         self.update()
 
@@ -158,8 +158,10 @@ class RecordingScreen(ft.UserControl):
                     self.max_frame_amount = 30
 
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                image.flags.writeable = False # Disables any modifications of the 2D array
                 hand_results = hands.process(image) 
                 face_results = face_mesh.process(image)
+                image.flags.writeable = True # Allows any modifications of the 2D array
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
                 self.draw_landmarks(image, hand_results, face_results)

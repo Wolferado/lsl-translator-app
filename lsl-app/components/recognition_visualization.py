@@ -54,10 +54,11 @@ class RecognitionVisualization(ft.UserControl):
                  
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 image = cv2.flip(image, 1) # Flip the stream
-
+                image.flags.writeable = False # Disables any modifications of the 2D array
                 hand_results = hands.process(image) 
                 face_results = face_mesh.process(image)
-                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                image.flags.writeable = True # Allows any modifications of the 2D array
+                image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
                 #self.draw_landmarks(image, hand_results, face_results)
                 self.process_landmarks(image, hand_results, face_results)

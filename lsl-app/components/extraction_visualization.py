@@ -102,11 +102,14 @@ class ExtractionVisualization(ft.UserControl):
 
                 self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) # Shift array to the right by one place
                 self.left_hand_tracing_points_pos[:18] = tracing_points # Replace first element (that came from the end of the array) with a new one
+
                 landmarks_points = np.array([[point.x, point.y, point.z] for point in hand_results.multi_hand_landmarks[0].landmark]).flatten() # Get all landmarks points and make them 1D
                 left_hand_points_pos = np.concatenate([landmarks_points, self.left_hand_tracing_points_pos]) # Combine both landmarks' and tracing arrays.
+
             elif(self.left_hand_visible == False):
                 self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) # Shift array to the right by one place
                 self.left_hand_tracing_points_pos[:18] = np.zeros(18) # Replace first element (that came from the end of the array) with a new one
+
                 left_hand_points_pos = np.concatenate([np.zeros(63), self.left_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
 
             # If right hand got detected
@@ -124,6 +127,7 @@ class ExtractionVisualization(ft.UserControl):
 
                 self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) # Shift array to the right by one place
                 self.right_hand_tracing_points_pos[:18] = tracing_points # Replace first element (that came from the end of the array) with a new one
+
                 landmarks_points = np.array([[point.x, point.y, point.z] for point in hand_results.multi_hand_landmarks[0].landmark]).flatten() # Get all landmarks points and make them 1D
                 right_hand_points_pos = np.concatenate([landmarks_points, self.right_hand_tracing_points_pos]) # Combine both landmarks' and tracing arrays.
             
@@ -145,34 +149,86 @@ class ExtractionVisualization(ft.UserControl):
 
     # Method to detect hands and face
     def detect_hands_and_face(self):
-        current_file_num = 0
-        total_file_amount = 0
+        if(self.create_new_folders == True):
+            self.scan_files_create_folders()
+        else:
+            self.scan_files()
+    
+    # Method to go through files and create folders
+    def scan_files_create_folders(self):
+        for folder in os.listdir(self.extraction_directory):
+            file_amount = 0
+            current_file = 0
 
+            # Get amount of files in the folder
+            for file in os.scandir(os.path.join(self.extraction_directory, folder)):
+                if file.is_file():
+                    file_amount += 1
+
+            # For each file in the directory
+            for file in os.listdir(os.path.join(self.extraction_directory, folder)):
+                current_file += 1
+
+                file_path = "{}/{}/{}".format(self.extraction_directory, folder, file)
+
+                self.cap = cv2.VideoCapture(filename=file_path)
+
+                data_path = "{}/{}".format(self.saving_directory, folder)
+                if(os.path.isdir(data_path) == False):
+                    os.mkdir(data_path)
+
+                # Create a mask for the hands and face
+                with mp_hands.Hands(min_detection_confidence=0.9, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.4, max_num_faces=1) as face_mesh:
+                    number = 0
+                    while True:
+                        orig_path = "{}/{}".format(data_path, number)
+                        if(os.path.isdir(orig_path) == False):
+                            os.mkdir(orig_path)
+                            break
+                        elif (os.path.isdir(orig_path)):
+                            number += 1
+
+                    # Save original video data
+                    self.load_file(folder_name=folder, file_number=current_file, files_amount=file_amount, original_video_data_path=orig_path, flipped_video_data_path=None, hands_model=hands, face_mesh_model=face_mesh)
+                    
+                    number = 0
+                    if self.flip_file == True:
+                        while True:
+                            flip_path = "{}/{}".format(data_path, number)
+                            if(os.path.isdir(flip_path) == False):
+                                os.mkdir(flip_path)
+                                break
+                            else:
+                                number += 1
+                        
+                        self.cap = cv2.VideoCapture(filename=file_path)
+                        # Save flipped video data
+                        self.load_file(folder_name=folder, file_number=current_file, files_amount=file_amount, original_video_data_path=None, flipped_video_data_path=flip_path, hands_model=hands, face_mesh_model=face_mesh)
+
+    def scan_files(self):
+        current_file = 0
+        file_amount = 0
+        # Get amount of files in the folder
         for file in os.scandir(self.extraction_directory):
             if file.is_file():
-                total_file_amount += 1
+                file_amount += 1
 
+        # For each file in the directory
         for file in os.listdir(self.extraction_directory):
-            current_file_num += 1
+            current_file += 1
 
             file_path = "{}/{}".format(self.extraction_directory, file)
+
             self.cap = cv2.VideoCapture(filename=file_path)
 
-            if(self.create_new_folders == True):
-                dataPath = "{}/{}".format(self.saving_directory, file[:-3])
-                if(os.path.isdir(dataPath) == False):
-                    os.mkdir(dataPath)
-            else:
-                dataPath = self.saving_directory
-
-            current_frame = 0
+            data_path = self.saving_directory
 
             # Create a mask for the hands and face
             with mp_hands.Hands(min_detection_confidence=0.9, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.4, max_num_faces=1) as face_mesh:
-                
                 number = 0
+
                 while True:
-                    orig_path = "{}/{}".format(dataPath, number)
+                    orig_path = "{}/{}".format(data_path, number)
                     if(os.path.isdir(orig_path) == False):
                         os.mkdir(orig_path)
                         break
@@ -180,12 +236,13 @@ class ExtractionVisualization(ft.UserControl):
                         number += 1
 
                 # Save original video data
-                self.load_file(frame_number=current_frame, file_number=current_file_num, files_amount=total_file_amount, original_video_data_path=orig_path, flipped_video_data_path=None, hands_model=hands, face_mesh_model=face_mesh)
+                self.load_file(folder_name=file.rsplit('.')[0], file_number=current_file, files_amount=file_amount, original_video_data_path=orig_path, flipped_video_data_path=None, hands_model=hands, face_mesh_model=face_mesh)
                 
                 number = 0
+
                 if self.flip_file == True:
                     while True:
-                        flip_path = "{}/{}".format(dataPath, number)
+                        flip_path = "{}/{}".format(data_path, number)
                         if(os.path.isdir(flip_path) == False):
                             os.mkdir(flip_path)
                             break
@@ -193,10 +250,14 @@ class ExtractionVisualization(ft.UserControl):
                             number += 1
                     
                     self.cap = cv2.VideoCapture(filename=file_path)
-                    # Save flipped video data
-                    self.load_file(frame_number=current_frame, file_number=current_file_num, files_amount=total_file_amount, original_video_data_path=None, flipped_video_data_path=flip_path, hands_model=hands, face_mesh_model=face_mesh)
 
-    def load_file(self, frame_number, file_number, files_amount, original_video_data_path, flipped_video_data_path, hands_model, face_mesh_model):
+                    # Save flipped video data
+                    self.load_file(folder_name=file.rsplit('.')[0], file_number=current_file, files_amount=file_amount, original_video_data_path=None, flipped_video_data_path=flip_path, hands_model=hands, face_mesh_model=face_mesh)
+
+
+    def load_file(self, folder_name, file_number, files_amount, original_video_data_path, flipped_video_data_path, hands_model, face_mesh_model):
+        frame_number = 0
+
         while self.cap.isOpened():
             ret, image = self.cap.read() # Read file's image (ret - is that a frame or empty file, image - frame data)
 
@@ -208,14 +269,16 @@ class ExtractionVisualization(ft.UserControl):
 
             if flipped_video_data_path: # If video is supposed to be flipped (exists path to save the flipped video)
                 image = cv2.flip(image, 1)
-                cv2.putText(image, "Flipped Video, {} of {}".format(file_number, files_amount), (10,30), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0), 2)
+                cv2.putText(image, "{} - Flipped Video, {} of {}".format(folder_name, file_number, files_amount), (10,30), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0), 2)
             elif original_video_data_path: # If video is supposed to be original (exists path to save the original video)
-                cv2.putText(image, "Original Video, {} of {}".format(file_number, files_amount), (10,30), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0), 2)
+                cv2.putText(image, "{} - Original Video, {} of {}".format(folder_name, file_number, files_amount), (10,30), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0), 2)
 
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # Convert image to BGR for better face and hand tracking
+            image.flags.writeable = False # Disable any modifications of the 2D array
             hand_results = hands_model.process(image) # Get data about hands landmarks
             face_results = face_mesh_model.process(image) # Get data about face landmarks
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # Convert image to RGB for better appearance
+            image.flags.writeable = True # Allows any modifications of the 2D array
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR) # Convert image to RGB for better appearance
 
             data = self.extract_results_landmarks(hand_results, face_results) # Extract data about face and hands landmakrs
 
