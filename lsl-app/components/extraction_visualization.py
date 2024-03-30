@@ -36,7 +36,6 @@ class ExtractionVisualization(ft.UserControl):
 
     def update_timer(self):
         self.begin_extraction()
-
     
     def draw_landmarks(self, image, hand_results, face_results):
         """Method to draw landmarks on face and hands.
@@ -110,10 +109,8 @@ class ExtractionVisualization(ft.UserControl):
 
                 # Replace created array with NumPy array and make it 1D.
                 tracing_points = np.array(tracing_points).flatten()
-
                 # Tracing points update for left hand
-                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) # Shift array to the right by one element
-                self.left_hand_tracing_points_pos[:18] = tracing_points # Replace first element (that came from the end of the array) with a new one
+                self.update_left_hand_tracing_points(tracing_points, True)
 
                 # Combine data
                 landmarks_points = np.array([[point.x, point.y, point.z] for point in hand_results.multi_hand_landmarks[0].landmark]).flatten() # Get all landmarks points and make them 1D
@@ -122,9 +119,7 @@ class ExtractionVisualization(ft.UserControl):
             # If left hand didn't get detected
             elif(self.left_hand_visible == False):
                 # Tracing points update for left hand
-                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) # Shift array to the right by one element
-                self.left_hand_tracing_points_pos[:18] = np.zeros(18) # Replace first element (that came from the end of the array) with a new one
-
+                self.update_left_hand_tracing_points(None, False)
                 # Combine data
                 left_hand_points_pos = np.concatenate([np.zeros(63), self.left_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
 
@@ -140,10 +135,8 @@ class ExtractionVisualization(ft.UserControl):
 
                 # Replace created array with NumPy array and make it 1D.
                 tracing_points = np.array(tracing_points).flatten()
-
                 # Tracing points update for right hand
-                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) # Shift array to the right by one element
-                self.right_hand_tracing_points_pos[:18] = tracing_points # Replace first element (that came from the end of the array) with a new one
+                self.update_right_hand_tracing_points(tracing_points, True)
 
                 # Combine data
                 landmarks_points = np.array([[point.x, point.y, point.z] for point in hand_results.multi_hand_landmarks[0].landmark]).flatten() # Get all landmarks points and make them 1D
@@ -152,21 +145,16 @@ class ExtractionVisualization(ft.UserControl):
             # If right hand didn't get detected
             elif(self.right_hand_visible == False):
                 # Tracing points update for right hand
-                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) # Shift array to the right by one element
-                self.right_hand_tracing_points_pos[:18] = np.zeros(18) # Replace first element with zeros
-
+                self.update_right_hand_tracing_points(None, False)
                 # Combine data
                 right_hand_points_pos = np.concatenate([np.zeros(63), self.right_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
 
         # If no hands detected
         else:
             # Tracing points update for left hand
-            self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) # Shift array to the right by one place
-            self.left_hand_tracing_points_pos[:18] = np.zeros(18) # Replace first element (that came from the end of the array) with a new one
-
+            self.update_left_hand_tracing_points(None, False)
             # Tracing points update for right hand
-            self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) # Shift array to the right by one place
-            self.right_hand_tracing_points_pos[:18] = np.zeros(18) # Replace first element (that came from the end of the array) with a new one
+            self.update_right_hand_tracing_points(None, False)
 
             # Combine data
             left_hand_points_pos = np.concatenate([np.zeros(63), self.left_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
@@ -175,26 +163,39 @@ class ExtractionVisualization(ft.UserControl):
         # Return full data
         return np.concatenate([face_points_pos, left_hand_points_pos, right_hand_points_pos])
 
-    def update_tracing_points(self, hand_tracing_points_data, new_tracing_points, hand_detected, hand_recognized):
-            """Method to update tracing points array.\n
+    def update_left_hand_tracing_points(self, new_tracing_points, left_hand_detected):
+            """Method to update tracing points array for left hand.\n
             Shifts tracing point array to the right for one element and adds one at the first index.
 
             Keyword arguments:\n
             hand_tracing_points_data -- MediaPipe Hands landmarks [0, 4, 8, 12, 16, 20] tracing points collection.\n
             new_tracing_points -- MediaPipe Hands new landmarks for tracing points.\n
-            hand_detected -- Boolean value to check, if any hand got detected.\n
-            hand_recognized -- Boolean value to check, if specific hand got detected.
+            left_hand_detected -- Boolean value to check, if left hand got detected.
             """
-            if (hand_recognized == True and hand_detected == True):
-                hand_tracing_points_data = np.roll(hand_tracing_points_data, 18) 
-                hand_tracing_points_data[:18] = new_tracing_points 
-            elif (hand_recognized == False and hand_detected == True):
-                hand_tracing_points_data = np.roll(hand_tracing_points_data, 18) 
-                hand_tracing_points_data[:18] = np.zeros(18) 
-            elif (hand_recognized == False and hand_detected == False):
-                hand_tracing_points_data = np.roll(hand_tracing_points_data, 18) 
-                hand_tracing_points_data[:18] = np.zeros(18) 
+            if (left_hand_detected == True):
+                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) 
+                self.left_hand_tracing_points_pos[:18] = new_tracing_points 
+            else:
+                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) 
+                self.left_hand_tracing_points_pos[:18] = np.zeros(18) 
 
+            print(self.left_hand_tracing_points_pos)
+
+    def update_right_hand_tracing_points(self, new_tracing_points, right_hand_detected):
+            """Method to update tracing points array for right hand.\n
+            Shifts tracing point array to the right for one element and adds one at the first index.
+
+            Keyword arguments:\n
+            hand_tracing_points_data -- MediaPipe Hands landmarks [0, 4, 8, 12, 16, 20] tracing points collection.\n
+            new_tracing_points -- MediaPipe Hands new landmarks for tracing points.\n
+            left_hand_detected -- Boolean value to check, if right hand got detected.
+            """
+            if (right_hand_detected == True):
+                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) 
+                self.right_hand_tracing_points_pos[:18] = new_tracing_points 
+            else :
+                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) 
+                self.right_hand_tracing_points_pos[:18] = np.zeros(18) 
 
     def begin_extraction(self):
         """Method to start extraction process."""
