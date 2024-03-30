@@ -35,11 +35,17 @@ class ExtractionVisualization(ft.UserControl):
         self.th.join()
 
     def update_timer(self):
-        self.detect_hands_and_face()
+        self.begin_extraction()
 
-    # Method to draw landmarks on face and hands.
-    # Parse image (frame) and processed hands and face results
+    
     def draw_landmarks(self, image, hand_results, face_results):
+        """Method to draw landmarks on face and hands.
+
+        Keyword arguments:\n
+        image -- image that cap has read.\n
+        hand_results -- results of MediaPipe Hands model processing.\n
+        face_results -- results of MediaPipe FaceMesh model processing.
+        """
         # Draw face landmarks, if any
         if face_results.multi_face_landmarks:
             for face in face_results.multi_face_landmarks:
@@ -62,14 +68,19 @@ class ExtractionVisualization(ft.UserControl):
                     connection_drawing_spec = mp_drawing.DrawingSpec(color=(255, 0, 0), thickness=1, circle_radius=1) # Customize connections
                 ) 
 
-    # Method to concatenate hands and face landmarks.
-    # Parse both results variables.
     def extract_results_landmarks(self, hand_results, face_results):
-        left_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(18), 5)]) # Array of right hand landmarks and tracing landmarks
+        """"Method to extract landmarks of face and hands.
+
+        Keyword arguments:\n
+        hand_results -- results of MediaPipe Hands model processing.\n
+        face_results -- results of MediaPipe FaceMesh model processing.
+        """
+        left_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(18), 5)]) # Array of left hand landmarks and tracing landmarks
         right_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(18), 5)]) # Array of right hand landmarks and tracing landmarks
-        face_points_pos = np.zeros(1404)
+        face_points_pos = np.zeros(1404) # Array of face landmarks.
         tracing_points_index = [0, 4, 8, 12, 16, 20] # Six points (wrist, thumb_tip, index_finger_tip, middle_finger_tip, ring_finger_tip, pinky_tip)
 
+        # Variables for hand statuses.
         self.right_hand_visible = False
         self.left_hand_visible = False
 
@@ -100,16 +111,21 @@ class ExtractionVisualization(ft.UserControl):
                 # Replace created array with NumPy array and make it 1D.
                 tracing_points = np.array(tracing_points).flatten()
 
-                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) # Shift array to the right by one place
+                # Tracing points update for left hand
+                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) # Shift array to the right by one element
                 self.left_hand_tracing_points_pos[:18] = tracing_points # Replace first element (that came from the end of the array) with a new one
 
+                # Combine data
                 landmarks_points = np.array([[point.x, point.y, point.z] for point in hand_results.multi_hand_landmarks[0].landmark]).flatten() # Get all landmarks points and make them 1D
                 left_hand_points_pos = np.concatenate([landmarks_points, self.left_hand_tracing_points_pos]) # Combine both landmarks' and tracing arrays.
 
+            # If left hand didn't get detected
             elif(self.left_hand_visible == False):
-                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) # Shift array to the right by one place
+                # Tracing points update for left hand
+                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) # Shift array to the right by one element
                 self.left_hand_tracing_points_pos[:18] = np.zeros(18) # Replace first element (that came from the end of the array) with a new one
 
+                # Combine data
                 left_hand_points_pos = np.concatenate([np.zeros(63), self.left_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
 
             # If right hand got detected
@@ -118,44 +134,77 @@ class ExtractionVisualization(ft.UserControl):
                 
                 # For each index in the array of needed indexes
                 for idx in tracing_points_index:
-                    # Get X, Y, Z coords about the indexed landmark
+                    # Get X, Y, Z coords about the indexed landmark and add them to the array.
                     landmark = hand_results.multi_hand_landmarks[0].landmark[idx]
                     tracing_points.append([landmark.x, landmark.y, landmark.z])
 
                 # Replace created array with NumPy array and make it 1D.
                 tracing_points = np.array(tracing_points).flatten()
 
-                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) # Shift array to the right by one place
+                # Tracing points update for right hand
+                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) # Shift array to the right by one element
                 self.right_hand_tracing_points_pos[:18] = tracing_points # Replace first element (that came from the end of the array) with a new one
 
+                # Combine data
                 landmarks_points = np.array([[point.x, point.y, point.z] for point in hand_results.multi_hand_landmarks[0].landmark]).flatten() # Get all landmarks points and make them 1D
                 right_hand_points_pos = np.concatenate([landmarks_points, self.right_hand_tracing_points_pos]) # Combine both landmarks' and tracing arrays.
             
+            # If right hand didn't get detected
             elif(self.right_hand_visible == False):
-                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) # Shift array to the right by one place
-                self.right_hand_tracing_points_pos[:18] = np.zeros(18) # Replace first element (that came from the end of the array) with a new one
+                # Tracing points update for right hand
+                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) # Shift array to the right by one element
+                self.right_hand_tracing_points_pos[:18] = np.zeros(18) # Replace first element with zeros
+
+                # Combine data
                 right_hand_points_pos = np.concatenate([np.zeros(63), self.right_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
 
+        # If no hands detected
         else:
+            # Tracing points update for left hand
             self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) # Shift array to the right by one place
             self.left_hand_tracing_points_pos[:18] = np.zeros(18) # Replace first element (that came from the end of the array) with a new one
-            left_hand_points_pos = np.concatenate([np.zeros(63), self.left_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
 
+            # Tracing points update for right hand
             self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) # Shift array to the right by one place
             self.right_hand_tracing_points_pos[:18] = np.zeros(18) # Replace first element (that came from the end of the array) with a new one
+
+            # Combine data
+            left_hand_points_pos = np.concatenate([np.zeros(63), self.left_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
             right_hand_points_pos = np.concatenate([np.zeros(63), self.right_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
 
+        # Return full data
         return np.concatenate([face_points_pos, left_hand_points_pos, right_hand_points_pos])
 
-    # Method to detect hands and face
-    def detect_hands_and_face(self):
+    def update_tracing_points(self, hand_tracing_points_data, new_tracing_points, hand_detected, hand_recognized):
+            """Method to update tracing points array.\n
+            Shifts tracing point array to the right for one element and adds one at the first index.
+
+            Keyword arguments:\n
+            hand_tracing_points_data -- MediaPipe Hands landmarks [0, 4, 8, 12, 16, 20] tracing points collection.\n
+            new_tracing_points -- MediaPipe Hands new landmarks for tracing points.\n
+            hand_detected -- Boolean value to check, if any hand got detected.\n
+            hand_recognized -- Boolean value to check, if specific hand got detected.
+            """
+            if (hand_recognized == True and hand_detected == True):
+                hand_tracing_points_data = np.roll(hand_tracing_points_data, 18) 
+                hand_tracing_points_data[:18] = new_tracing_points 
+            elif (hand_recognized == False and hand_detected == True):
+                hand_tracing_points_data = np.roll(hand_tracing_points_data, 18) 
+                hand_tracing_points_data[:18] = np.zeros(18) 
+            elif (hand_recognized == False and hand_detected == False):
+                hand_tracing_points_data = np.roll(hand_tracing_points_data, 18) 
+                hand_tracing_points_data[:18] = np.zeros(18) 
+
+
+    def begin_extraction(self):
+        """Method to start extraction process."""
         if(self.create_new_folders == True):
             self.scan_files_create_folders()
         else:
             self.scan_files()
     
-    # Method to go through files and create folders
     def scan_files_create_folders(self):
+        """Method to scan files in the selected directory (with creating folders for each subfolder in the directory)."""
         for folder in os.listdir(self.extraction_directory):
             file_amount = 0
             current_file = 0
@@ -168,9 +217,7 @@ class ExtractionVisualization(ft.UserControl):
             # For each file in the directory
             for file in os.listdir(os.path.join(self.extraction_directory, folder)):
                 current_file += 1
-
                 file_path = "{}/{}/{}".format(self.extraction_directory, folder, file)
-
                 self.cap = cv2.VideoCapture(filename=file_path)
 
                 data_path = "{}/{}".format(self.saving_directory, folder)
@@ -189,7 +236,7 @@ class ExtractionVisualization(ft.UserControl):
                             number += 1
 
                     # Save original video data
-                    self.load_file(folder_name=folder, file_number=current_file, files_amount=file_amount, original_video_data_path=orig_path, flipped_video_data_path=None, hands_model=hands, face_mesh_model=face_mesh)
+                    self.save_landmarks_data_from_file(folder_name=folder, file_number=current_file, files_amount=file_amount, original_data_path=orig_path, flipped_data_path=None, hands_model=hands, face_mesh_model=face_mesh)
                     
                     number = 0
                     if self.flip_file == True:
@@ -203,9 +250,10 @@ class ExtractionVisualization(ft.UserControl):
                         
                         self.cap = cv2.VideoCapture(filename=file_path)
                         # Save flipped video data
-                        self.load_file(folder_name=folder, file_number=current_file, files_amount=file_amount, original_video_data_path=None, flipped_video_data_path=flip_path, hands_model=hands, face_mesh_model=face_mesh)
+                        self.save_landmarks_data_from_file(folder_name=folder, file_number=current_file, files_amount=file_amount, original_data_path=None, flipped_data_path=flip_path, hands_model=hands, face_mesh_model=face_mesh)
 
     def scan_files(self):
+        """Method to scan files in the selected directory (without creating new folders for subfolders in the directory)."""
         current_file = 0
         file_amount = 0
         # Get amount of files in the folder
@@ -216,17 +264,13 @@ class ExtractionVisualization(ft.UserControl):
         # For each file in the directory
         for file in os.listdir(self.extraction_directory):
             current_file += 1
-
             file_path = "{}/{}".format(self.extraction_directory, file)
-
             self.cap = cv2.VideoCapture(filename=file_path)
-
             data_path = self.saving_directory
 
             # Create a mask for the hands and face
             with mp_hands.Hands(min_detection_confidence=0.9, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.4, max_num_faces=1) as face_mesh:
                 number = 0
-
                 while True:
                     orig_path = "{}/{}".format(data_path, number)
                     if(os.path.isdir(orig_path) == False):
@@ -236,10 +280,9 @@ class ExtractionVisualization(ft.UserControl):
                         number += 1
 
                 # Save original video data
-                self.load_file(folder_name=file.rsplit('.')[0], file_number=current_file, files_amount=file_amount, original_video_data_path=orig_path, flipped_video_data_path=None, hands_model=hands, face_mesh_model=face_mesh)
+                self.save_landmarks_data_from_file(folder_name=file.rsplit('.')[0], file_number=current_file, files_amount=file_amount, original_data_path=orig_path, flipped_data_path=None, hands_model=hands, face_mesh_model=face_mesh)
                 
                 number = 0
-
                 if self.flip_file == True:
                     while True:
                         flip_path = "{}/{}".format(data_path, number)
@@ -252,10 +295,20 @@ class ExtractionVisualization(ft.UserControl):
                     self.cap = cv2.VideoCapture(filename=file_path)
 
                     # Save flipped video data
-                    self.load_file(folder_name=file.rsplit('.')[0], file_number=current_file, files_amount=file_amount, original_video_data_path=None, flipped_video_data_path=flip_path, hands_model=hands, face_mesh_model=face_mesh)
+                    self.save_landmarks_data_from_file(folder_name=file.rsplit('.')[0], file_number=current_file, files_amount=file_amount, original_data_path=None, flipped_data_path=flip_path, hands_model=hands, face_mesh_model=face_mesh)
 
+    def save_landmarks_data_from_file(self, folder_name, file_number, files_amount, original_data_path, flipped_data_path, hands_model, face_mesh_model):
+        """Method to load a file from the desired path.
 
-    def load_file(self, folder_name, file_number, files_amount, original_video_data_path, flipped_video_data_path, hands_model, face_mesh_model):
+        Keyword arguments:\n
+        folder_name -- name of the folder, where file is located.\n
+        file_number -- number of the current file.\n
+        files_amount -- amount of the files in the folder.\n
+        original_data_path -- path to the folder containing original video data (put None, if you wish to pass it).\n
+        flipped_data_path -- path to the folder containing flipped video data (put None, if you wish to pass it).\n
+        hands_model -- MediaPipe Hands model.\n
+        face_mesh_model -- MediaPipe FaceMesh model.
+        """
         frame_number = 0
 
         while self.cap.isOpened():
@@ -267,10 +320,10 @@ class ExtractionVisualization(ft.UserControl):
 
             image = cv2.resize(image, (640, 480), interpolation = cv2.INTER_AREA)
 
-            if flipped_video_data_path: # If video is supposed to be flipped (exists path to save the flipped video)
+            if flipped_data_path: # If video is supposed to be flipped (exists path to save the flipped video)
                 image = cv2.flip(image, 1)
                 cv2.putText(image, "{} - Flipped Video, {} of {}".format(folder_name, file_number, files_amount), (10,30), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0), 2)
-            elif original_video_data_path: # If video is supposed to be original (exists path to save the original video)
+            elif original_data_path: # If video is supposed to be original (exists path to save the original video)
                 cv2.putText(image, "{} - Original Video, {} of {}".format(folder_name, file_number, files_amount), (10,30), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0), 2)
 
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # Convert image to BGR for better face and hand tracking
@@ -284,10 +337,10 @@ class ExtractionVisualization(ft.UserControl):
 
             if hand_results.multi_hand_landmarks: # If there are hands in the frame detected
             
-                if original_video_data_path:
-                    np.save("{}/{}".format(original_video_data_path, frame_number), data)
-                elif flipped_video_data_path:
-                    np.save("{}/{}".format(flipped_video_data_path, frame_number), data)           
+                if original_data_path:
+                    np.save("{}/{}".format(original_data_path, frame_number), data)
+                elif flipped_data_path:
+                    np.save("{}/{}".format(flipped_data_path, frame_number), data)           
                 
                 frame_number += 1
 
