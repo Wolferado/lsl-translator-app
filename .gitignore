@@ -12,3 +12,5 @@ Notes.md
 /lsl-app/components/__pycache__
 # Models (for development stage)
 /models
+# Script for testing stuff
+/test.py
