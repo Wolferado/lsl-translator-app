@@ -12,11 +12,12 @@ mp_drawing = mp.solutions.drawing_utils # Enabling drawing utilities from MediaP
 mp_drawing_styles = mp.solutions.drawing_styles
 
 class ExtractionVisualization(ft.UserControl):
-    def _init_(self, extraction_directory, saving_directory, flip_file, create_new_folders):
+    def _init_(self, extraction_directory, saving_directory, flip_file, create_new_folders, images_only):
         self.extraction_directory = extraction_directory
         self.saving_directory = saving_directory
         self.flip_file = flip_file
         self.create_new_folders = create_new_folders
+        self.images_only = images_only
 
     def build(self):
         self.image = ft.Image()
@@ -76,8 +77,15 @@ class ExtractionVisualization(ft.UserControl):
         """
         left_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(18), 5)]) # Array of left hand landmarks and tracing landmarks
         right_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(18), 5)]) # Array of right hand landmarks and tracing landmarks
-        face_points_pos = np.zeros(1404) # Array of face landmarks.
-        tracing_points_index = [0, 4, 8, 12, 16, 20] # Six points (wrist, thumb_tip, index_finger_tip, middle_finger_tip, ring_finger_tip, pinky_tip)
+        face_points_pos = np.zeros(366) # Array of face landmarks. # 1404 - all landmarks, 366 - outer circle, eyebrows, eyes and mouth.
+        face_selected_landmarks_indexes = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 215, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 
+                                           46, 53, 52, 65, 55, 70, 63, 105, 66, 107, 
+                                           285, 295, 282, 283, 276, 336, 296, 334, 293, 300,
+                                           33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7,
+                                           362, 398, 384, 385, 386, 387, 388, 466, 253, 249, 390, 373, 374, 380, 381, 382,
+                                           185, 40, 39, 37, 0, 267, 269, 270, 409, 375, 321, 405, 314, 17, 84, 181, 91, 146,
+                                           80, 81, 82, 13, 312, 311, 310, 445, 318, 402, 317, 14, 87, 178, 95]
+        tracing_points_indexes = [0, 4, 8, 12, 16, 20] # Six points (wrist, thumb_tip, index_finger_tip, middle_finger_tip, ring_finger_tip, pinky_tip)
 
         # Variables for hand statuses.
         self.right_hand_visible = False
@@ -85,7 +93,15 @@ class ExtractionVisualization(ft.UserControl):
 
         # If face detected
         if face_results.multi_face_landmarks:
-            face_points_pos = np.array([[point.x, point.y, point.z] for point in face_results.multi_face_landmarks[0].landmark]).flatten()
+            landmarks_list = []
+
+            for idx in face_selected_landmarks_indexes: 
+                    # Get X, Y, Z coords about the indexed landmark and add them to the array.
+                    landmark = face_results.multi_face_landmarks[0].landmark[idx]
+                    landmarks_list.append([landmark.x, landmark.y, landmark.z])
+
+            face_points_pos = np.array(landmarks_list).flatten()
+            #face_points_pos = np.array([[point.x, point.y, point.z] for point in face_results.multi_face_landmarks[0].landmark]).flatten()
 
         # If hands got detected
         # Note: Classification labels are set completely opposite, because in video they recognize it that way 
@@ -102,7 +118,7 @@ class ExtractionVisualization(ft.UserControl):
                 tracing_points = []
 
                 # For each index in the array of needed indexes
-                for idx in tracing_points_index: 
+                for idx in tracing_points_indexes: 
                     # Get X, Y, Z coords about the indexed landmark and add them to the array.
                     landmark = hand_results.multi_hand_landmarks[0].landmark[idx]
                     tracing_points.append([landmark.x, landmark.y, landmark.z])
@@ -128,7 +144,7 @@ class ExtractionVisualization(ft.UserControl):
                 tracing_points = []
                 
                 # For each index in the array of needed indexes
-                for idx in tracing_points_index:
+                for idx in tracing_points_indexes:
                     # Get X, Y, Z coords about the indexed landmark and add them to the array.
                     landmark = hand_results.multi_hand_landmarks[0].landmark[idx]
                     tracing_points.append([landmark.x, landmark.y, landmark.z])
@@ -172,14 +188,15 @@ class ExtractionVisualization(ft.UserControl):
             new_tracing_points -- MediaPipe Hands new landmarks for tracing points.\n
             left_hand_detected -- Boolean value to check, if left hand got detected.
             """
+            if self.images_only == True:
+                return
+
             if (left_hand_detected == True):
                 self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) 
                 self.left_hand_tracing_points_pos[:18] = new_tracing_points 
             else:
                 self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) 
                 self.left_hand_tracing_points_pos[:18] = np.zeros(18) 
-
-            print(self.left_hand_tracing_points_pos)
 
     def update_right_hand_tracing_points(self, new_tracing_points, right_hand_detected):
             """Method to update tracing points array for right hand.\n
@@ -188,8 +205,11 @@ class ExtractionVisualization(ft.UserControl):
             Keyword arguments:\n
             hand_tracing_points_data -- MediaPipe Hands landmarks [0, 4, 8, 12, 16, 20] tracing points collection.\n
             new_tracing_points -- MediaPipe Hands new landmarks for tracing points.\n
-            left_hand_detected -- Boolean value to check, if right hand got detected.
+            right_hand_detected -- Boolean value to check, if right hand got detected.
             """
+            if self.images_only == True:
+                return
+
             if (right_hand_detected == True):
                 self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) 
                 self.right_hand_tracing_points_pos[:18] = new_tracing_points 
@@ -226,7 +246,7 @@ class ExtractionVisualization(ft.UserControl):
                     os.mkdir(data_path)
 
                 # Create a mask for the hands and face
-                with mp_hands.Hands(min_detection_confidence=0.9, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.4, max_num_faces=1) as face_mesh:
+                with mp_hands.Hands(min_detection_confidence=0.5, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.4, max_num_faces=1) as face_mesh:
                     number = 0
                     while True:
                         orig_path = "{}/{}".format(data_path, number)
@@ -250,6 +270,7 @@ class ExtractionVisualization(ft.UserControl):
                                 number += 1
                         
                         self.cap = cv2.VideoCapture(filename=file_path)
+
                         # Save flipped video data
                         self.save_landmarks_data_from_file(folder_name=folder, file_number=current_file, files_amount=file_amount, original_data_path=None, flipped_data_path=flip_path, hands_model=hands, face_mesh_model=face_mesh)
 
@@ -270,7 +291,7 @@ class ExtractionVisualization(ft.UserControl):
             data_path = self.saving_directory
 
             # Create a mask for the hands and face
-            with mp_hands.Hands(min_detection_confidence=0.9, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.4, max_num_faces=1) as face_mesh:
+            with mp_hands.Hands(min_detection_confidence=0.5, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.4, max_num_faces=1) as face_mesh:
                 number = 0
                 while True:
                     orig_path = "{}/{}".format(data_path, number)
@@ -310,6 +331,9 @@ class ExtractionVisualization(ft.UserControl):
         hands_model -- MediaPipe Hands model.\n
         face_mesh_model -- MediaPipe FaceMesh model.
         """
+        self.left_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
+        self.right_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
+
         frame_number = 0
 
         while self.cap.isOpened():
@@ -343,7 +367,7 @@ class ExtractionVisualization(ft.UserControl):
                 elif flipped_data_path:
                     np.save("{}/{}".format(flipped_data_path, frame_number), data)           
                 
-                frame_number += 1
+            frame_number += 1
 
             self.draw_landmarks(image, hand_results, face_results) # Draw landmarks on visualization
 
