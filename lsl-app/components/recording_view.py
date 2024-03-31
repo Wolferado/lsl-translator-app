@@ -4,6 +4,7 @@ import mediapipe as mp # Library for hand detection
 import cv2 # Library for camera manipulations
 import base64 # For conversion
 import os
+import winsound # For notification sound
 
 mp_hands = mp.solutions.hands # Load the solution from mediapipe library
 mp_face_mesh = mp.solutions.face_mesh # Load the solution from mediapipe library
@@ -31,6 +32,11 @@ class RecordingScreen(ft.UserControl):
             text="Select folder where to save data",
             icon=ft.icons.FOLDER,
             on_click=lambda _: self.get_saving_directory_dialog.get_directory_path(dialog_title="Select directory to where save data")
+        )
+
+        self.file_count_label = ft.Text(
+            value="No directory selected.",
+            size=14
         )
 
         self.take_picture_btn = ft.ElevatedButton(
@@ -69,6 +75,7 @@ class RecordingScreen(ft.UserControl):
             controls=[
                 self.app_title,
                 self.select_saving_directory_btn,
+                self.file_count_label,
                 self.get_saving_directory_dialog,
                 self.take_picture_btn,
                 self.start_recording_btn,
@@ -98,6 +105,7 @@ class RecordingScreen(ft.UserControl):
             self.select_saving_directory_btn.text = "Select data saving directory"
 
         self.update()
+        self.update_file_count_label()
 
     def enable_disable_control_btn(self):
         if self.saving_directory:
@@ -107,7 +115,6 @@ class RecordingScreen(ft.UserControl):
             self.take_picture_btn.disabled = True
             self.start_recording_btn.disabled = True
 
-
     def take_picture(self, e):
         print("Picture taken")
 
@@ -115,16 +122,20 @@ class RecordingScreen(ft.UserControl):
 
         self.update()
 
+        self.update_file_count_label()
+
     def start_recording(self, e):
         self.start_recording_btn.visible = False
         self.stop_recording_btn.visible = True
 
-        self.out = cv2.VideoWriter("{}/{}.mp4".format(self.saving_directory, self.count_files()), -1, 20.0, (640, 480))
+        self.out = cv2.VideoWriter("{}/{}.mp4".format(self.saving_directory, self.count_files()), -1, 15.0, (640, 480))
         self.recording_started = True
 
         self.update()
 
     def stop_recording(self, e):
+        winsound.MessageBeep(type=winsound.MB_ICONASTERISK)
+
         self.start_recording_btn.visible = True
         self.stop_recording_btn.visible = False
 
@@ -132,25 +143,32 @@ class RecordingScreen(ft.UserControl):
         self.out.release()
 
         self.update()
+
+        self.update_file_count_label()
 
     def stop_recording_lambda(self):
+        winsound.MessageBeep(type=winsound.MB_ICONASTERISK)
+
         self.start_recording_btn.visible = True
         self.stop_recording_btn.visible = False
 
         self.recording_started = False
         self.out.release()
 
+
         self.update()
 
+        self.update_file_count_label()
+
     def detect_hands_and_face(self):
-        with mp_hands.Hands(min_detection_confidence=0.9, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.5, max_num_faces=1) as face_mesh:
+        with mp_hands.Hands(min_detection_confidence=0.5, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.5, max_num_faces=1) as face_mesh:
             while self.cap.isOpened():
                 ret, image = self.cap.read()
 
                 image = cv2.flip(image, 1) # Flip the stream
                 self.original_image = image
 
-                if(self.recording_started == True and self.max_frame_amount >= 0):
+                if(self.recording_started == True and self.max_frame_amount > 0):
                     self.out.write(self.original_image)
                     self.max_frame_amount -= 1
                 elif (self.recording_started == True and self.max_frame_amount < 0):
@@ -196,6 +214,14 @@ class RecordingScreen(ft.UserControl):
                     landmark_drawing_spec = mp_drawing.DrawingSpec(color=(0, 0, 0), thickness=1, circle_radius=1), # Customize landmarks
                     connection_drawing_spec = mp_drawing.DrawingSpec(color=(255, 0, 255), thickness=2, circle_radius=2) # Customize connections
                 ) 
+
+    def update_file_count_label(self):
+        if self.saving_directory:
+            self.file_count_label.value = "Directory has {} file(s)".format(self.count_files())
+        else:
+            self.file_count_label.value = "No directory selected."
+
+        self.file_count_label.update()
 
     def count_files(self) -> int:
         total_file_amount = 0
