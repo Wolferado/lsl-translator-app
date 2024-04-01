@@ -1,64 +1,197 @@
+import joblib
 from sklearn.model_selection import train_test_split
 from keras.utils import to_categorical
 
 from keras.models import Sequential
-from keras.layers import LSTM, Dense
-from keras.callbacks import TensorBoard
+from keras.layers import LSTM, Dense, SimpleRNN
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+
+from keras.saving import save_model
+from keras.utils import plot_model
 
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 
-directory = r"C:\Users\akare\Documents\RTU\Bakalaura darbs\sign-translation-prototype\sign_data"
-folder_names = os.listdir(directory)
-labels_enum = {label:num for num, label in enumerate(folder_names)}
+class ModelCreator():
+    def __init__(self):
+        self.directory = os.path.join(os.curdir, "sign_data")
+        self.sign_folders = os.listdir(self.directory) # All folders
+        #self.sign_folders = ['a', 'b', 'c'] # Three letters
+        self.max_frame_amount = 30
+        self.face_points_amount = 366 # 1404 - whole face, 366 - limited face
+        self.hand_points_amount = 153 # 63 - not traceable, 153 - traceable
+        self.X_data = None
+        self.Y_data = None
+        self.model = None
+        self.history = None
+        self.main()
 
-sequences = []
-labels = []
+    def main(self):
+        # Extract data from materials in the directory
+        self.get_data_from_directory()
 
-for folder in folder_names:
-    for sequence in os.listdir(os.path.join(directory, folder)):
-        window = []
-        for frame_number in range(0, 100): # From 1st until 100th frame
-            current_file = os.path.join(directory, folder, sequence, "{}.npy".format(frame_number)) # From each .npy file
-            if os.path.isfile(current_file) == True: # If file is present
-                if(os.path.getsize(current_file) > 0): # If file contains information
-                    res = np.load(os.path.join(current_file)) # Get info from that .npy file
-                    window.append(res) # And append it to the window
-                else: # Otherwise, if file doesn't contain information, assign only zeros to it
-                    res = np.concatenate([np.zeros(1404), np.zeros(63), np.zeros(63)])
-                    window.append(res)
-            else: # Otherwise, if there isn't file, assign only zeros to it
-                res = np.concatenate([np.zeros(1404), np.zeros(63), np.zeros(63)])
-                window.append(res)
+        # LSTM model
+        self.create_and_compile_lstm_model()
+        self.display_lstm_model_and_graphs()
+
+        # RNN model
+        #self.create_and_compile_rnn_model()
+        #self.display_simplernn_model_and_graphs()
         
-        sequences.append(window)
-        labels.append(labels_enum[folder])
+        # Random Forest model
+        #self.create_and_compile_random_forest_model()
 
-print(np.array(sequences).shape)
+    def get_data_from_directory(self):
+        labels_enum = {label:num for num, label in enumerate(self.sign_folders)}
 
-X = np.array(sequences)
-Y = to_categorical(labels)
-X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.05)
-print(X.shape)
-print(Y.shape)
+        print("Enumerated labels: ", labels_enum)
 
-log_dir = os.path.join(r"C:\Users\akare\Documents\RTU\Bakalaura darbs\sign-translation-prototype\logs")
-tb_callback = TensorBoard(log_dir=log_dir)
+        data_collection = []
+        labels = []
 
-model = Sequential()
-model.add(LSTM(64, return_sequences=True, activation='sigmoid', input_shape=(100,1530)))
-model.add(LSTM(128, return_sequences=True, activation='sigmoid'))
-model.add(LSTM(64, return_sequences=False, activation='sigmoid'))
-model.add(Dense(64, activation='sigmoid'))
-model.add(Dense(32, activation='sigmoid'))
-model.add(Dense(np.array(folder_names).shape[0], activation='softmax'))
+        for data_folder in self.sign_folders: # For each data folder in array of folder names
+            for sub_folder in os.listdir(os.path.join(self.directory, data_folder)): # For each subfolder in the folder of the sign_folders
+                data = [] # Array to store the values
 
-model.compile(optimizer='Adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
+                for frame in range(0, self.max_frame_amount): # From 1st until maximum allowed frame
+                    current_file = os.path.join(self.directory, data_folder, sub_folder, "{}.npy".format(frame)) # From each .npy file
+                    
+                    if os.path.isfile(current_file) == True: # If file is present
+                        if(os.path.getsize(current_file) > 0): # If file contains information
+                            res = np.load(current_file) # Get info from that .npy file
+                            data.append(res) # And append it to the window
 
-model.fit(X_train, Y_train, epochs=500, callbacks=[tb_callback])
+                    else: # Otherwise, if file doesn't contain information, assign only zeros to it
+                        res = np.concatenate([np.zeros(self.face_points_amount), np.zeros(self.hand_points_amount), np.zeros(self.hand_points_amount)])
+                        data.append(res)
+                
+                data_collection.append(data) # Append data to sequence of defined letter or word
+                labels.append(labels_enum[data_folder]) # Append name of the folder along with its index
 
-model.summary()
+        self.X_data = np.array(data_collection) # 3D array of all data from frames. [file[frames[data]]]
+        self.Y_data = to_categorical(labels) # 2D array for categories in both 
 
-model.save('signs_model.h5')
+    def create_and_compile_rnn_model(self):
+        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.X_data, self.Y_data, test_size=0.05)
 
-model.load_weights('signs_model.h5')
+        print(self.X_data.shape)
+        print(self.Y_data.shape)
+        
+        self.model = Sequential([
+            SimpleRNN(64, return_sequences=True, activation='relu', input_shape=(self.max_frame_amount, (self.face_points_amount + 2 * self.hand_points_amount))), # 1530 - non-traceable, 1710 - traceable
+            SimpleRNN(32, return_sequences=False, activation='relu'),
+            Dense(32, activation='relu'),
+            Dense(np.array(self.sign_folders).shape[0], activation='softmax') # Layer that contains all possible outputs
+        ])
+
+        self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
+
+        self.history = self.model.fit(self.x_train, self.y_train, epochs=150, validation_data=(self.x_test, self.y_test))
+
+        self.model.summary()
+
+        save_model(self.model, 'rnn_model.keras')
+
+    def create_and_compile_lstm_model(self):
+        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.X_data, self.Y_data, test_size=0.05)
+
+        print(self.X_data.shape)
+        print(self.Y_data.shape)
+        
+        self.model = Sequential([
+            LSTM(64, return_sequences=True, activation='sigmoid', input_shape=(self.max_frame_amount, (self.face_points_amount + 2 * self.hand_points_amount))), # 1530 - non-traceable, 1710 - traceable
+            LSTM(32, return_sequences=False, activation='sigmoid'),
+            Dense(32, activation='sigmoid'),
+            Dense(np.array(self.sign_folders).shape[0], activation='softmax') # Layer that contains all possible outputs
+        ])
+
+        self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
+
+        self.history = self.model.fit(self.x_train, self.y_train, epochs=300, validation_data=(self.x_test, self.y_test))
+
+        self.model.summary()
+
+        save_model(self.model, 'lstm_model.keras')
+
+    def create_and_compile_random_forest_model(self):
+        # Reshaping 3D array, so it will be 2D array with first column being the same with Y_data..
+        self.X_data = self.X_data.reshape(self.X_data.shape[0], self.X_data.shape[1] * self.X_data.shape[2])
+
+        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.X_data, self.Y_data, test_size=0.05)
+
+        print(self.X_data.shape)
+        print(self.Y_data.shape)
+
+        self.model = RandomForestClassifier(n_estimators=275)
+
+        self.history = self.model.fit(self.x_train, self.y_train)
+
+        y_predict = self.model.predict(self.x_test)
+
+        print("Accuracy score: ", accuracy_score(self.y_test, y_predict))
+
+        joblib.dump(self.model, "./random_forest_model.joblib")
+
+    def display_lstm_model_and_graphs(self):
+        plot_model(model=self.model, to_file='lstm_model_structure.png', show_shapes=True)
+
+        print(self.history.history.keys())
+
+        accuracy_figure = plt.figure(1)
+        plt.plot(self.history.history['categorical_accuracy'], color='#0277bd')
+        plt.plot(self.history.history['val_categorical_accuracy'], linestyle='dashed', color='#f77500')
+        plt.legend(['accuracy', 'val_accuracy'])
+        plt.title('LSTM model categorical accuracy overtime')
+        plt.xlabel('epoch')
+        plt.ylabel('categorical_accuracy')
+        accuracy_figure.show()
+
+        loss_figure = plt.figure(2)
+        plt.plot(self.history.history['loss'], color='#0277bd')
+        plt.plot(self.history.history['val_loss'], linestyle='dashed', color='#f77500')
+        plt.legend(['loss', 'val_loss'])
+        plt.title('LSTM model loss overtime')
+        plt.xlabel('epoch')
+        plt.ylabel('loss')
+        loss_figure.show()
+
+        plt.show()
+    
+    def display_simplernn_model_and_graphs(self):
+        plot_model(model=self.model, to_file='simplernn_model_structure.png', show_shapes=True)
+
+        print(self.history.history.keys())
+
+        accuracy_figure = plt.figure(1)
+        plt.plot(self.history.history['categorical_accuracy'], color='#0277bd')
+        plt.plot(self.history.history['val_categorical_accuracy'], linestyle='dashed', color='#f77500')
+        plt.legend(['accuracy', 'val_accuracy'])
+        plt.title('RNN model categorical accuracy overtime')
+        plt.xlabel('epoch')
+        plt.ylabel('categorical_accuracy')
+        accuracy_figure.show()
+
+        loss_figure = plt.figure(2)
+        plt.plot(self.history.history['loss'], color='#0277bd')
+        plt.plot(self.history.history['val_loss'], linestyle='dashed', color='#f77500')
+        plt.legend(['loss', 'val_loss'])
+        plt.title('RNN model loss overtime')
+        plt.xlabel('epoch')
+        plt.ylabel('loss')
+        loss_figure.show()
+
+        plt.show()
+
+    def count_files(self, directory) -> int:
+        total_file_amount = 0
+
+        for file in os.scandir(directory):
+            if file.is_file():
+                total_file_amount += 1
+
+        return total_file_amount
+
+if __name__ == "__main__":
+    model_creator = ModelCreator()
