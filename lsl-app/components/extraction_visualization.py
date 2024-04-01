@@ -231,9 +231,7 @@ class ExtractionVisualization(ft.UserControl):
             current_file = 0
 
             # Get amount of files in the folder
-            for file in os.scandir(os.path.join(self.extraction_directory, folder)):
-                if file.is_file():
-                    file_amount += 1
+            file_amount = self.count_files(os.path.join(self.extraction_directory, folder))
 
             # For each file in the directory
             for file in os.listdir(os.path.join(self.extraction_directory, folder)):
@@ -376,3 +374,12 @@ class ExtractionVisualization(ft.UserControl):
                 image_b64 = base64.b64encode(image_arr)
                 self.image.src_base64 = image_b64.decode("utf-8")
                 self.image.update()
+
+    def count_files(self, directory) -> int:
+        total_file_amount = 0
+
+        for file in os.scandir(directory):
+            if file.is_file():
+                total_file_amount += 1
+
+        return total_file_amount
