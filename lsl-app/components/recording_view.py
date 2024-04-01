@@ -171,7 +171,7 @@ class RecordingScreen(ft.UserControl):
                 if(self.recording_started == True and self.max_frame_amount > 0):
                     self.out.write(self.original_image)
                     self.max_frame_amount -= 1
-                elif (self.recording_started == True and self.max_frame_amount < 0):
+                elif (self.recording_started == True and self.max_frame_amount <= 0):
                     self.stop_recording_lambda()
                     self.max_frame_amount = 30
 
