@@ -345,9 +345,9 @@ class ExtractionVisualization(ft.UserControl):
 
             if flipped_data_path: # If video is supposed to be flipped (exists path to save the flipped video)
                 image = cv2.flip(image, 1)
-                cv2.putText(image, "{} - Flipped Video, {} of {}".format(folder_name, file_number, files_amount), (10,30), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0), 2)
+                cv2.putText(image, "{} - Flipped Video, {} of {}".format(folder_name, file_number, files_amount), (10,30), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 2)
             elif original_data_path: # If video is supposed to be original (exists path to save the original video)
-                cv2.putText(image, "{} - Original Video, {} of {}".format(folder_name, file_number, files_amount), (10,30), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0), 2)
+                cv2.putText(image, "{} - Original Video, {} of {}".format(folder_name, file_number, files_amount), (10,30), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 2)
 
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # Convert image to BGR for better face and hand tracking
             image.flags.writeable = False # Disable any modifications of the 2D array
@@ -358,12 +358,12 @@ class ExtractionVisualization(ft.UserControl):
 
             data = self.extract_results_landmarks(hand_results, face_results) # Extract data about face and hands landmakrs
 
-            if hand_results.multi_hand_landmarks: # If there are hands in the frame detected
+            #if hand_results.multi_hand_landmarks: # If there are hands in the frame detected
             
-                if original_data_path:
-                    np.save("{}/{}".format(original_data_path, frame_number), data)
-                elif flipped_data_path:
-                    np.save("{}/{}".format(flipped_data_path, frame_number), data)           
+            if original_data_path:
+                np.save("{}/{}".format(original_data_path, frame_number), data)
+            elif flipped_data_path:
+                np.save("{}/{}".format(flipped_data_path, frame_number), data)           
                 
             frame_number += 1
 
