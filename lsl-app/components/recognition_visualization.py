@@ -3,36 +3,67 @@ import flet as ft # GUI library
 import mediapipe as mp # Library for hand detection
 import cv2 # Library for camera manipulations
 import base64 # For conversion
+import keras # For model methods
+import os # To access model file
+import joblib
+import numpy as np
 
 mp_hands = mp.solutions.hands # Load the solution from mediapipe library
 mp_face_mesh = mp.solutions.face_mesh # Load the solution from mediapipe library
 mp_drawing = mp.solutions.drawing_utils # Enabling drawing utilities from MediaPipe library
 mp_drawing_styles = mp.solutions.drawing_styles
 
-# Enable a camera for the input (old variant, global, doesn't relaunch, if stopped)
-# cap = cv2.VideoCapture(0)
+letters = os.listdir(os.path.join(os.curdir, "sign_data")) # All folders
 
 class RecognitionVisualization(ft.UserControl):
     def build(self):
         self.image = ft.Image()
+        self.image.width = 420
+        self.image.height = 280
         self.left_hand_visible = False
         self.right_hand_visible = False
+        self.left_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
+        self.right_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
+
         self.left_hand_detected_icon = ft.Icon(name=ft.icons.BACK_HAND_OUTLINED, color=ft.colors.GREY)
         self.face_detected_icon = ft.Icon(name=ft.icons.TAG_FACES_OUTLINED, color=ft.colors.GREY)
         self.right_hand_detected_icon = ft.Icon(name=ft.icons.FRONT_HAND_OUTLINED, color=ft.colors.GREY)
+        
         self.icon_row = ft.Row(
             controls=[self.left_hand_detected_icon, self.face_detected_icon, self.right_hand_detected_icon]
         )
+        self.dropdown_menu = ft.Dropdown(
+            value="RNN",
+            autofocus=False,
+            text_size=16,
+            width=150,
+            options=[
+                ft.dropdown.Option("RNN"),
+                ft.dropdown.Option("LSTM"),
+                ft.dropdown.Option("Random Forest")
+            ],
+            on_change=self.on_dropdown_change
+        )
+
+        self.icon_row_and_dropdown_container = ft.Row(
+            controls=[self.icon_row, self.dropdown_menu],
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+        )
+
         self.text_field = ft.TextField(
             label="Text Recognition",
-            value="Awaiting the sign 👋..."
+            value=""
         )
+
+        self.sequence = []
+        self.model_name = "rnn_model"
+        self.model = keras.models.load_model(os.path.join(os.getcwd(), 'lsl-app', 'models', "{}.keras".format(self.model_name)))
         
         self.cap = cv2.VideoCapture(0)
 
         return ft.Column(
             alignment=ft.alignment.center,
-            controls=[self.image, self.icon_row, self.text_field]
+            controls=[self.image, self.icon_row_and_dropdown_container, self.text_field]
         )
     
     def did_mount(self): # Controls appeared on the page
@@ -46,12 +77,26 @@ class RecognitionVisualization(ft.UserControl):
     def update_timer(self):
         self.detect_hands_and_face()
 
+    def on_dropdown_change(self, e):
+        self.sequence = []
+
+        if self.dropdown_menu.value == "Random Forest":
+            self.model_name = self.dropdown_menu.value
+            self.model = joblib.load((os.path.join(os.getcwd(), 'lsl-app', 'models', "random_forest.joblib")))
+            self.text_field.value = ""
+            self.text_field.update()
+        else:
+            self.model_name = "{}_model".format(str.lower(self.dropdown_menu.value))
+            self.model = keras.models.load_model(os.path.join(os.getcwd(), 'lsl-app', 'models', "{}.keras".format(self.model_name)))
+            self.text_field.value = ""
+            self.text_field.update()
+
     def detect_hands_and_face(self):
         # Create a mask for the hands
         with mp_hands.Hands(min_detection_confidence=0.9, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.5, max_num_faces=1) as face_mesh:
             while self.cap.isOpened():
                 ret, image = self.cap.read()
-                 
+
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 image = cv2.flip(image, 1) # Flip the stream
                 image.flags.writeable = False # Disables any modifications of the 2D array
@@ -107,6 +152,34 @@ class RecognitionVisualization(ft.UserControl):
             self.left_hand_visible = False
             self.right_hand_visible = False
 
+        self.sequence.append(self.extract_landmarks(hand_results, face_results))
+
+        if(len(self.sequence) == 30):
+            if(self.model_name == "Random Forest"):
+                #self.sequence = np.split(np.array(self.sequence), [366, 519], axis=2)
+                self.sequence = np.array(self.sequence)
+                print(self.sequence.shape) # (30, 672)
+                print(self.sequence.shape[0]) # 30
+                self.sequence = self.sequence.reshape(self.sequence.shape[0] * self.sequence.shape[1])
+                print(self.sequence.shape) # 20160
+
+                result = self.model.predict(np.expand_dims(self.sequence, axis=0))[0]
+                print(np.array(self.sequence).shape)
+                self.sequence = []
+                print(letters[np.argmax(result)], ", id: ", result.argmax(axis=-1))
+                print(result[np.argmax(result)])
+                self.text_field.value = "{}".format(letters[np.argmax(result)])
+                self.text_field.update()
+
+            else:
+                result = self.model.predict(np.expand_dims(self.sequence, axis=0))[0]
+                print(np.array(self.sequence).shape)
+                self.sequence = []
+                print(letters[np.argmax(result)], ", id: ", result.argmax(axis=-1))
+                print(result[np.argmax(result)])
+                self.text_field.value = "{}".format(letters[np.argmax(result)])
+                self.text_field.update()
+
         self.icon_row.update()
 
     def draw_landmarks(self, image, hand_results, face_results):
@@ -134,4 +207,147 @@ class RecognitionVisualization(ft.UserControl):
                     connection_drawing_spec = mp_drawing.DrawingSpec(color=(255, 0, 255), thickness=2, circle_radius=2) # Customize connections
                 ) 
 
+    def extract_landmarks(self, hand_results, face_results):
+        """"Method to extract landmarks of face and hands.
+
+        Keyword arguments:\n
+        hand_results -- results of MediaPipe Hands model processing.\n
+        face_results -- results of MediaPipe FaceMesh model processing.
+        """
+        left_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(18), 5)]) # Array of left hand landmarks and tracing landmarks
+        right_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(18), 5)]) # Array of right hand landmarks and tracing landmarks
+        face_points_pos = np.zeros(366) # Array of face landmarks. # 1404 - all landmarks, 366 - outer circle, eyebrows, eyes and mouth.
+        face_selected_landmarks_indexes = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 215, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 
+                                           46, 53, 52, 65, 55, 70, 63, 105, 66, 107, 
+                                           285, 295, 282, 283, 276, 336, 296, 334, 293, 300,
+                                           33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7,
+                                           362, 398, 384, 385, 386, 387, 388, 466, 253, 249, 390, 373, 374, 380, 381, 382,
+                                           185, 40, 39, 37, 0, 267, 269, 270, 409, 375, 321, 405, 314, 17, 84, 181, 91, 146,
+                                           80, 81, 82, 13, 312, 311, 310, 445, 318, 402, 317, 14, 87, 178, 95]
+        tracing_points_indexes = [0, 4, 8, 12, 16, 20] # Six points (wrist, thumb_tip, index_finger_tip, middle_finger_tip, ring_finger_tip, pinky_tip)
+
+        # Variables for hand statuses.
+        self.right_hand_visible = False
+        self.left_hand_visible = False
+
+        # If face detected
+        if face_results.multi_face_landmarks:
+            landmarks_list = []
+
+            for idx in face_selected_landmarks_indexes: 
+                    # Get X, Y, Z coords about the indexed landmark and add them to the array.
+                    landmark = face_results.multi_face_landmarks[0].landmark[idx]
+                    landmarks_list.append([landmark.x, landmark.y, landmark.z])
+
+            face_points_pos = np.array(landmarks_list).flatten()
+            #face_points_pos = np.array([[point.x, point.y, point.z] for point in face_results.multi_face_landmarks[0].landmark]).flatten()
+
+        # If hands got detected
+        # Note: Classification labels are set completely opposite, because in video they recognize it that way 
+        if hand_results.multi_hand_landmarks:
+            # Set boolean variables based on showed hands
+            for hand in hand_results.multi_handedness:
+                if(hand.classification[0].label == "Left"): 
+                    self.left_hand_visible = True
+                if(hand.classification[0].label == "Right"): 
+                    self.right_hand_visible = True
+
+            # If left hand got detected
+            if(self.left_hand_visible == True):
+                tracing_points = []
+
+                # For each index in the array of needed indexes
+                for idx in tracing_points_indexes: 
+                    # Get X, Y, Z coords about the indexed landmark and add them to the array.
+                    landmark = hand_results.multi_hand_landmarks[0].landmark[idx]
+                    tracing_points.append([landmark.x, landmark.y, landmark.z])
+
+                # Replace created array with NumPy array and make it 1D.
+                tracing_points = np.array(tracing_points).flatten()
+                # Tracing points update for left hand
+                self.update_left_hand_tracing_points(tracing_points, True)
+
+                # Combine data
+                landmarks_points = np.array([[point.x, point.y, point.z] for point in hand_results.multi_hand_landmarks[0].landmark]).flatten() # Get all landmarks points and make them 1D
+                left_hand_points_pos = np.concatenate([landmarks_points, self.left_hand_tracing_points_pos]) # Combine both landmarks' and tracing arrays.
+
+            # If left hand didn't get detected
+            elif(self.left_hand_visible == False):
+                # Tracing points update for left hand
+                self.update_left_hand_tracing_points(None, False)
+                # Combine data
+                left_hand_points_pos = np.concatenate([np.zeros(63), self.left_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
+
+            # If right hand got detected
+            if(self.right_hand_visible == True):
+                tracing_points = []
+                
+                # For each index in the array of needed indexes
+                for idx in tracing_points_indexes:
+                    # Get X, Y, Z coords about the indexed landmark and add them to the array.
+                    landmark = hand_results.multi_hand_landmarks[0].landmark[idx]
+                    tracing_points.append([landmark.x, landmark.y, landmark.z])
+
+                # Replace created array with NumPy array and make it 1D.
+                tracing_points = np.array(tracing_points).flatten()
+                # Tracing points update for right hand
+                self.update_right_hand_tracing_points(tracing_points, True)
+
+                # Combine data
+                landmarks_points = np.array([[point.x, point.y, point.z] for point in hand_results.multi_hand_landmarks[0].landmark]).flatten() # Get all landmarks points and make them 1D
+                right_hand_points_pos = np.concatenate([landmarks_points, self.right_hand_tracing_points_pos]) # Combine both landmarks' and tracing arrays.
+            
+            # If right hand didn't get detected
+            elif(self.right_hand_visible == False):
+                # Tracing points update for right hand
+                self.update_right_hand_tracing_points(None, False)
+                # Combine data
+                right_hand_points_pos = np.concatenate([np.zeros(63), self.right_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
+
+        # If no hands detected
+        else:
+            # Tracing points update for left hand
+            self.update_left_hand_tracing_points(None, False)
+            # Tracing points update for right hand
+            self.update_right_hand_tracing_points(None, False)
+
+            # Combine data
+            left_hand_points_pos = np.concatenate([np.zeros(63), self.left_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
+            right_hand_points_pos = np.concatenate([np.zeros(63), self.right_hand_tracing_points_pos]) # Combine empty landmarks' and changed tracing arrays.
+
+        # Return full data
+        return np.concatenate([face_points_pos, left_hand_points_pos, right_hand_points_pos])
     
+    def update_left_hand_tracing_points(self, new_tracing_points, left_hand_detected):
+            """Method to update tracing points array for left hand.\n
+            Shifts tracing point array to the right for one element and adds one at the first index.
+
+            Keyword arguments:\n
+            hand_tracing_points_data -- MediaPipe Hands landmarks [0, 4, 8, 12, 16, 20] tracing points collection.\n
+            new_tracing_points -- MediaPipe Hands new landmarks for tracing points.\n
+            left_hand_detected -- Boolean value to check, if left hand got detected.
+            """
+
+            if (left_hand_detected == True):
+                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) 
+                self.left_hand_tracing_points_pos[:18] = new_tracing_points 
+            else:
+                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) 
+                self.left_hand_tracing_points_pos[:18] = np.zeros(18) 
+
+    def update_right_hand_tracing_points(self, new_tracing_points, right_hand_detected):
+            """Method to update tracing points array for right hand.\n
+            Shifts tracing point array to the right for one element and adds one at the first index.
+
+            Keyword arguments:\n
+            hand_tracing_points_data -- MediaPipe Hands landmarks [0, 4, 8, 12, 16, 20] tracing points collection.\n
+            new_tracing_points -- MediaPipe Hands new landmarks for tracing points.\n
+            right_hand_detected -- Boolean value to check, if right hand got detected.
+            """
+
+            if (right_hand_detected == True):
+                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) 
+                self.right_hand_tracing_points_pos[:18] = new_tracing_points 
+            else :
+                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) 
+                self.right_hand_tracing_points_pos[:18] = np.zeros(18) 
