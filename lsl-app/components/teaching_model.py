@@ -11,6 +11,7 @@ from keras.saving import save_model
 from keras.utils import plot_model
 
 import os
+from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -37,11 +38,13 @@ class ModelCreator():
         self.display_lstm_model_and_graphs()
 
         # RNN model
-        #self.create_and_compile_rnn_model()
-        #self.display_simplernn_model_and_graphs()
+        self.create_and_compile_simplernn_model()
+        self.display_simplernn_model_and_graphs()
         
         # Random Forest model
-        #self.create_and_compile_random_forest_model()
+        self.create_and_compile_random_forest_model()
+
+        input("Press any key to exit...")
 
     def get_data_from_directory(self):
         labels_enum = {label:num for num, label in enumerate(self.sign_folders)}
@@ -51,29 +54,26 @@ class ModelCreator():
         data_collection = []
         labels = []
 
+        last_time = datetime.now()
+
         for data_folder in self.sign_folders: # For each data folder in array of folder names
+            print(datetime.now(), ", Processed ", data_folder, " ({})".format(datetime.now() - last_time)) # For debugging
+            last_time = datetime.now()
             for sub_folder in os.listdir(os.path.join(self.directory, data_folder)): # For each subfolder in the folder of the sign_folders
                 data = [] # Array to store the values
 
                 for frame in range(0, self.max_frame_amount): # From 1st until maximum allowed frame
                     current_file = os.path.join(self.directory, data_folder, sub_folder, "{}.npy".format(frame)) # From each .npy file
-                    
-                    if os.path.isfile(current_file) == True: # If file is present
-                        if(os.path.getsize(current_file) > 0): # If file contains information
-                            res = np.load(current_file) # Get info from that .npy file
-                            data.append(res) # And append it to the window
+                    res = np.load(current_file) # Get info from that .npy file
+                    data.append(res) # And append it to the window
 
-                    else: # Otherwise, if file doesn't contain information, assign only zeros to it
-                        res = np.concatenate([np.zeros(self.face_points_amount), np.zeros(self.hand_points_amount), np.zeros(self.hand_points_amount)])
-                        data.append(res)
-                
                 data_collection.append(data) # Append data to sequence of defined letter or word
                 labels.append(labels_enum[data_folder]) # Append name of the folder along with its index
 
         self.X_data = np.array(data_collection) # 3D array of all data from frames. [file[frames[data]]]
         self.Y_data = to_categorical(labels) # 2D array for categories in both 
 
-    def create_and_compile_rnn_model(self):
+    def create_and_compile_simplernn_model(self):
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.X_data, self.Y_data, test_size=0.05)
 
         print(self.X_data.shape)
@@ -81,18 +81,16 @@ class ModelCreator():
         
         self.model = Sequential([
             SimpleRNN(64, return_sequences=True, activation='relu', input_shape=(self.max_frame_amount, (self.face_points_amount + 2 * self.hand_points_amount))), # 1530 - non-traceable, 1710 - traceable
-            SimpleRNN(32, return_sequences=False, activation='relu'),
-            Dense(32, activation='relu'),
+            SimpleRNN(128, return_sequences=True, activation='relu'),
+            SimpleRNN(64, return_sequences=False, activation='relu'),
             Dense(np.array(self.sign_folders).shape[0], activation='softmax') # Layer that contains all possible outputs
         ])
 
-        self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
+        self.model.compile(optimizer='nadam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
 
-        self.history = self.model.fit(self.x_train, self.y_train, epochs=150, validation_data=(self.x_test, self.y_test))
+        self.history = self.model.fit(self.x_train, self.y_train, epochs=100, validation_data=(self.x_test, self.y_test))
 
         self.model.summary()
-
-        save_model(self.model, 'rnn_model.keras')
 
     def create_and_compile_lstm_model(self):
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.X_data, self.Y_data, test_size=0.05)
@@ -109,14 +107,14 @@ class ModelCreator():
 
         self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
 
-        self.history = self.model.fit(self.x_train, self.y_train, epochs=300, validation_data=(self.x_test, self.y_test))
+        self.history = self.model.fit(self.x_train, self.y_train, epochs=150, validation_data=(self.x_test, self.y_test))
 
         self.model.summary()
 
         save_model(self.model, 'lstm_model.keras')
 
     def create_and_compile_random_forest_model(self):
-        # Reshaping 3D array, so it will be 2D array with first column being the same with Y_data..
+        # Reshaping 3D array, so it will be 2D array with first column being the same with Y_data.
         self.X_data = self.X_data.reshape(self.X_data.shape[0], self.X_data.shape[1] * self.X_data.shape[2])
 
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.X_data, self.Y_data, test_size=0.05)
@@ -124,7 +122,7 @@ class ModelCreator():
         print(self.X_data.shape)
         print(self.Y_data.shape)
 
-        self.model = RandomForestClassifier(n_estimators=275)
+        self.model = RandomForestClassifier(n_estimators=150)
 
         self.history = self.model.fit(self.x_train, self.y_train)
 
@@ -160,8 +158,6 @@ class ModelCreator():
         plt.show()
     
     def display_simplernn_model_and_graphs(self):
-        plot_model(model=self.model, to_file='simplernn_model_structure.png', show_shapes=True)
-
         print(self.history.history.keys())
 
         accuracy_figure = plt.figure(1)
@@ -182,7 +178,23 @@ class ModelCreator():
         plt.ylabel('loss')
         loss_figure.show()
 
-        plt.show()
+        plt.show(block=False)
+
+        while True:
+            save_model_bool = input("Save model? (Y/n): ")
+            if str.lower(save_model_bool[0]) == 'y':
+                save_model(self.model, 'rnn_model.keras')
+                break
+            elif str.lower(save_model_bool[0]) == 'n':
+                break
+
+        while True:
+            save_model_plot_bool = input("Save model plot? (Y/n): ")
+            if str.lower(save_model_plot_bool[0]) == 'y':
+                plot_model(model=self.model, to_file='simplernn_model_structure.png', show_shapes=True)
+                break
+            elif str.lower(save_model_bool[0]) == 'n':
+                break
 
     def count_files(self, directory) -> int:
         total_file_amount = 0
