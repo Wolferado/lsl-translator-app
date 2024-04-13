@@ -13,7 +13,7 @@ mp_face_mesh = mp.solutions.face_mesh # Load the solution from mediapipe library
 mp_drawing = mp.solutions.drawing_utils # Enabling drawing utilities from MediaPipe library
 mp_drawing_styles = mp.solutions.drawing_styles
 
-letters = os.listdir(os.path.join(os.curdir, "sign_data")) # All folders
+letters = ['a', 'ā', 'b', 'c', 'č', 'd', 'e', 'ē', 'f', 'g', 'ģ', 'h', 'i', 'ī', 'j', 'k', 'ķ', 'l', 'ļ', 'm', 'n', 'ņ', 'o', 'p', 'r', 's', 'š', 't', 'u', 'ū', 'v', 'z', 'ž', '_'] # All folders
 
 class RecognitionVisualization(ft.UserControl):
     def build(self):
@@ -29,11 +29,13 @@ class RecognitionVisualization(ft.UserControl):
         self.face_detected_icon = ft.Icon(name=ft.icons.TAG_FACES_OUTLINED, color=ft.colors.GREY)
         self.right_hand_detected_icon = ft.Icon(name=ft.icons.FRONT_HAND_OUTLINED, color=ft.colors.GREY)
         
+        self.model_threshold = 0.65
+
         self.icon_row = ft.Row(
             controls=[self.left_hand_detected_icon, self.face_detected_icon, self.right_hand_detected_icon]
         )
         self.dropdown_menu = ft.Dropdown(
-            value="RNN",
+            value="LSTM",
             autofocus=False,
             text_size=16,
             width=150,
@@ -56,7 +58,7 @@ class RecognitionVisualization(ft.UserControl):
         )
 
         self.sequence = []
-        self.model_name = "rnn_model"
+        self.model_name = "lstm_model"
         self.model = keras.models.load_model(os.path.join(os.getcwd(), 'lsl-app', 'models', "{}.keras".format(self.model_name)))
         
         self.cap = cv2.VideoCapture(0)
@@ -66,11 +68,11 @@ class RecognitionVisualization(ft.UserControl):
             controls=[self.image, self.icon_row_and_dropdown_container, self.text_field]
         )
     
-    def did_mount(self): # Controls appeared on the page
+    def did_mount(self): 
         self.th = threading.Thread(target=self.update_timer, args=(), daemon=True)
         self.th.start()
 
-    def will_unmount(self): # Controls disappeared from the page 
+    def will_unmount(self):
         self.th.join()
         self.cap.release() # Fixes endless LED on other pages
 
@@ -78,22 +80,32 @@ class RecognitionVisualization(ft.UserControl):
         self.detect_hands_and_face()
 
     def on_dropdown_change(self, e):
-        self.sequence = []
+        """Method to call when Machine Learning model is changed."""
 
+        # Clear all sequence and tracing points variables.
+        self.sequence = []
+        self.left_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
+        self.right_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
+
+        # If ML model is Random Forest
         if self.dropdown_menu.value == "Random Forest":
             self.model_name = self.dropdown_menu.value
-            self.model = joblib.load((os.path.join(os.getcwd(), 'lsl-app', 'models', "random_forest.joblib")))
-            self.text_field.value = ""
-            self.text_field.update()
-        else:
+            self.model = joblib.load((os.path.join(os.getcwd(), 'lsl-app', 'models', "random_forest_model.joblib")))
+
+        # If ML model is something else
+        else: 
             self.model_name = "{}_model".format(str.lower(self.dropdown_menu.value))
             self.model = keras.models.load_model(os.path.join(os.getcwd(), 'lsl-app', 'models', "{}.keras".format(self.model_name)))
-            self.text_field.value = ""
-            self.text_field.update()
+
+        # Clear text field
+        self.text_field.value = ""
+        self.text_field.update()
 
     def detect_hands_and_face(self):
+        """Method to detect face and hands in the video stream."""
+
         # Create a mask for the hands
-        with mp_hands.Hands(min_detection_confidence=0.9, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.5, max_num_faces=1) as face_mesh:
+        with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.55, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.65, max_num_faces=1) as face_mesh:
             while self.cap.isOpened():
                 ret, image = self.cap.read()
 
@@ -105,8 +117,11 @@ class RecognitionVisualization(ft.UserControl):
                 image.flags.writeable = True # Allows any modifications of the 2D array
                 image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
+                # self.draw_landmarks(image, hand_results, face_results)
+
                 #self.draw_landmarks(image, hand_results, face_results)
-                self.process_landmarks(image, hand_results, face_results)
+                self.process_landmarks(hand_results, face_results)
+                self.update_icon_row(hand_results, face_results)
 
                 # Open a window with the app
                 ret, image_arr = cv2.imencode(".png", image)
@@ -114,9 +129,59 @@ class RecognitionVisualization(ft.UserControl):
                 self.image.src_base64 = image_b64.decode("utf-8")
                 self.image.update()
         
-    # Method to process landmarks on face and hands and to change status icons.
-    # Parse image (frame) and processed hands and face results
-    def process_landmarks(self, image, hand_results, face_results):
+    def process_landmarks(self, hand_results, face_results):
+        """Method to process landmarks on face and hands and make prediction.
+
+        Keyword arguments:\n
+        hand_results -- Processed hand results.\n
+        face_results -- Processed face results.
+        """
+
+        # Draw hand landmarks, if any
+        if hand_results.multi_hand_landmarks:
+            # Set boolean variables for icons to false to check every frame
+            self.right_hand_visible = False
+            self.left_hand_visible = False
+
+            # Set boolean variables based on showed hands
+            for hand in hand_results.multi_handedness:
+                if(hand.classification[0].label == "Left"): 
+                    self.left_hand_visible = True
+                if(hand.classification[0].label == "Right"): 
+                    self.right_hand_visible = True
+
+        self.sequence.append(self.extract_landmarks(hand_results, face_results)) # Append extracted landmark information to the sequence
+
+        if(len(self.sequence) == 30): # If sequence contains information about 30 frames
+            if(self.model_name == "Random Forest"): # If Random Forest ML model is selected
+                print(np.array(self.sequence).shape) # (30, 672)
+                print(np.array(self.sequence).shape[0]) # 30
+                self.sequence = np.expand_dims(self.sequence, axis=0)
+                self.sequence = self.sequence.reshape(self.sequence.shape[0], self.sequence.shape[1] * self.sequence.shape[2]) # Reshape sequence array for ML model
+                print(self.sequence.shape) # (1, 20160)
+
+                result = self.model.predict(self.sequence)[0] # Get the result
+                print("Prob: {}, symbol #{} - {}".format(result[np.argmax(result)], result.argmax(axis=-1), letters[np.argmax(result)]))
+                self.sequence = []
+
+                self.text_field.value = "{}".format(letters[np.argmax(result)])
+                self.text_field.update()
+
+            else:
+                result = self.model.predict(np.expand_dims(self.sequence, axis=0))[0] # Get result by parsing expanded sequence array 
+                print(np.expand_dims(self.sequence, axis=0).shape) # (1, 30, 672)
+                print(np.array(self.sequence).shape) # (30, 672)
+                if (result[np.argmax(result)] >= self.model_threshold):
+                    print("Prob: {}, symbol #{} - {}".format(result[np.argmax(result)], result.argmax(axis=-1), letters[np.argmax(result)]))
+                    self.text_field.value = "{}".format(letters[np.argmax(result)])
+                    self.text_field.update()
+                    self.sequence = []
+                else:
+                    print("Prob: {}, symbol #{} - {}. INSUFFICIENT PROBABILTY.".format(result[np.argmax(result)], result.argmax(axis=-1), letters[np.argmax(result)]))
+                    self.sequence = []
+
+
+    def update_icon_row(self, hand_results, face_results):
         # Draw face landmarks, if any
         if face_results.multi_face_landmarks:
             self.face_detected_icon.color = ft.colors.GREEN_ACCENT_700 # Set icon color to green
@@ -149,41 +214,18 @@ class RecognitionVisualization(ft.UserControl):
         else:
             self.left_hand_detected_icon.color = ft.colors.GREY
             self.right_hand_detected_icon.color = ft.colors.GREY
-            self.left_hand_visible = False
-            self.right_hand_visible = False
-
-        self.sequence.append(self.extract_landmarks(hand_results, face_results))
-
-        if(len(self.sequence) == 30):
-            if(self.model_name == "Random Forest"):
-                #self.sequence = np.split(np.array(self.sequence), [366, 519], axis=2)
-                self.sequence = np.array(self.sequence)
-                print(self.sequence.shape) # (30, 672)
-                print(self.sequence.shape[0]) # 30
-                self.sequence = self.sequence.reshape(self.sequence.shape[0] * self.sequence.shape[1])
-                print(self.sequence.shape) # 20160
-
-                result = self.model.predict(np.expand_dims(self.sequence, axis=0))[0]
-                print(np.array(self.sequence).shape)
-                self.sequence = []
-                print(letters[np.argmax(result)], ", id: ", result.argmax(axis=-1))
-                print(result[np.argmax(result)])
-                self.text_field.value = "{}".format(letters[np.argmax(result)])
-                self.text_field.update()
-
-            else:
-                result = self.model.predict(np.expand_dims(self.sequence, axis=0))[0]
-                print(np.array(self.sequence).shape)
-                self.sequence = []
-                print(letters[np.argmax(result)], ", id: ", result.argmax(axis=-1))
-                print(result[np.argmax(result)])
-                self.text_field.value = "{}".format(letters[np.argmax(result)])
-                self.text_field.update()
 
         self.icon_row.update()
 
     def draw_landmarks(self, image, hand_results, face_results):
-        # Draw face landmarks, if any
+        """Method to draw landmarks on face and hands.
+
+        Keyword arguments:\n
+        image -- image that cap has read.\n
+        hand_results -- results of MediaPipe Hands model processing.\n
+        face_results -- results of MediaPipe FaceMesh model processing.
+        """
+
         if face_results.multi_face_landmarks:
             for face in face_results.multi_face_landmarks:
                 self.face_detected_icon.color = ft.colors.GREEN_ACCENT_700 # Set icon color to green

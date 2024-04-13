@@ -11,23 +11,20 @@ mp_face_mesh = mp.solutions.face_mesh # Load the solution from mediapipe library
 mp_drawing = mp.solutions.drawing_utils # Enabling drawing utilities from MediaPipe library
 mp_drawing_styles = mp.solutions.drawing_styles
 
-class RecordingScreen(ft.UserControl):
+class RecordingVisualization(ft.UserControl):
     def build(self):
         self.saving_directory = None
         self.recording_started = False
+        self.blur_enabled = False
         self.image = ft.Image()
+        self.image.width = 420
+        self.image.height = 280
         self.cap = cv2.VideoCapture(0)
         self.out = None
         self.max_frame_amount = 30
 
         self.get_saving_directory_dialog = ft.FilePicker(on_result=self.get_saving_directory)
 
-        self.app_title = ft.Container(
-            content=ft.Text('Data Creator', text_align=ft.TextAlign.CENTER, size=32), 
-            padding=10, 
-            alignment=ft.alignment.center
-        )
-        
         self.select_saving_directory_btn = ft.ElevatedButton(
             text="Select folder where to save data",
             icon=ft.icons.FOLDER,
@@ -45,6 +42,13 @@ class RecordingScreen(ft.UserControl):
             disabled=True,
             visible=True,
             on_click=self.take_picture
+        )
+
+        self.blur_checkbox = ft.Checkbox(
+            label="Enable blur",
+            value=False,
+            tooltip="Enables blur for the video.",
+            on_change=self.toggle_blur_checkbox
         )
         
         self.start_recording_btn = ft.ElevatedButton(
@@ -73,11 +77,11 @@ class RecordingScreen(ft.UserControl):
         return ft.Column(
             alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
-                self.app_title,
                 self.select_saving_directory_btn,
                 self.file_count_label,
                 self.get_saving_directory_dialog,
-                self.take_picture_btn,
+                self.blur_checkbox,
+                #self.take_picture_btn,
                 self.start_recording_btn,
                 self.stop_recording_btn,
                 self.camera_placeholder
@@ -96,6 +100,8 @@ class RecordingScreen(ft.UserControl):
         self.detect_hands_and_face()
 
     def get_saving_directory(self, e: ft.FilePickerResultEvent):
+        """Method to select saving directory."""
+        
         self.saving_directory = e.path
         self.enable_disable_control_btn()
 
@@ -115,7 +121,12 @@ class RecordingScreen(ft.UserControl):
             self.take_picture_btn.disabled = True
             self.start_recording_btn.disabled = True
 
+    def toggle_blur_checkbox(self, e):
+        self.blur_enabled = not self.blur_enabled
+
     def take_picture(self, e):
+        """Method to create a picture on button click."""
+
         print("Picture taken")
 
         cv2.imwrite("{}/{}.jpg".format(self.saving_directory, self.count_files()), self.original_image)
@@ -125,6 +136,8 @@ class RecordingScreen(ft.UserControl):
         self.update_file_count_label()
 
     def start_recording(self, e):
+        """Method to start video recording on button click."""
+
         self.start_recording_btn.visible = False
         self.stop_recording_btn.visible = True
 
@@ -133,7 +146,9 @@ class RecordingScreen(ft.UserControl):
 
         self.update()
 
-    def stop_recording(self, e):
+    def stop_recording(self, e=None):
+        """Method to stop video recording on button click."""
+
         winsound.MessageBeep(type=winsound.MB_ICONASTERISK)
 
         self.start_recording_btn.visible = True
@@ -141,29 +156,20 @@ class RecordingScreen(ft.UserControl):
 
         self.recording_started = False
         self.out.release()
-
-        self.update()
-
-        self.update_file_count_label()
-
-    def stop_recording_lambda(self):
-        winsound.MessageBeep(type=winsound.MB_ICONASTERISK)
-
-        self.start_recording_btn.visible = True
-        self.stop_recording_btn.visible = False
-
-        self.recording_started = False
-        self.out.release()
-
 
         self.update()
 
         self.update_file_count_label()
 
     def detect_hands_and_face(self):
-        with mp_hands.Hands(min_detection_confidence=0.5, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.5, max_num_faces=1) as face_mesh:
+        """Method to detect hands and face in the video stream."""
+
+        with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.55, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.65, max_num_faces=1) as face_mesh:
             while self.cap.isOpened():
                 ret, image = self.cap.read()
+
+                if(self.blur_enabled):
+                    image = cv2.blur(image, (15, 15))
 
                 image = cv2.flip(image, 1) # Flip the stream
                 self.original_image = image
@@ -172,7 +178,7 @@ class RecordingScreen(ft.UserControl):
                     self.out.write(self.original_image)
                     self.max_frame_amount -= 1
                 elif (self.recording_started == True and self.max_frame_amount <= 0):
-                    self.stop_recording_lambda()
+                    self.stop_recording()
                     self.max_frame_amount = 30
 
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -190,10 +196,15 @@ class RecordingScreen(ft.UserControl):
                 self.image.src_base64 = image_b64.decode("utf-8")
                 self.image.update()
 
-    # Method to draw landmarks on face and hands.
-    # Parse image (frame) and processed hands and face results
     def draw_landmarks(self, image, hand_results, face_results):
-        # Draw face landmarks, if any
+        """Method to draw landmarks on face and hands.
+
+        Keyword arguments:\n
+        image -- image that cap has read.\n
+        hand_results -- results of MediaPipe Hands model processing.\n
+        face_results -- results of MediaPipe FaceMesh model processing.
+        """
+
         if face_results.multi_face_landmarks:
             for face in face_results.multi_face_landmarks:
                 mp_drawing.draw_landmarks(
@@ -216,6 +227,8 @@ class RecordingScreen(ft.UserControl):
                 ) 
 
     def update_file_count_label(self):
+        """Method to update file count when recording of a file ends and/or when directory has been selected."""
+
         if self.saving_directory:
             self.file_count_label.value = "Directory has {} file(s)".format(self.count_files())
         else:
@@ -224,6 +237,8 @@ class RecordingScreen(ft.UserControl):
         self.file_count_label.update()
 
     def count_files(self) -> int:
+        """Method to count files in saving directory."""
+
         total_file_amount = 0
 
         for file in os.scandir(self.saving_directory):

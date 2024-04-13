@@ -12,12 +12,11 @@ mp_drawing = mp.solutions.drawing_utils # Enabling drawing utilities from MediaP
 mp_drawing_styles = mp.solutions.drawing_styles
 
 class ExtractionVisualization(ft.UserControl):
-    def _init_(self, extraction_directory, saving_directory, flip_file, create_new_folders, images_only):
+    def _init_(self, extraction_directory, saving_directory, flip_file, create_new_folders):
         self.extraction_directory = extraction_directory
         self.saving_directory = saving_directory
         self.flip_file = flip_file
         self.create_new_folders = create_new_folders
-        self.images_only = images_only
 
     def build(self):
         self.image = ft.Image()
@@ -188,8 +187,6 @@ class ExtractionVisualization(ft.UserControl):
             new_tracing_points -- MediaPipe Hands new landmarks for tracing points.\n
             left_hand_detected -- Boolean value to check, if left hand got detected.
             """
-            if self.images_only == True:
-                return
 
             if (left_hand_detected == True):
                 self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) 
@@ -207,8 +204,6 @@ class ExtractionVisualization(ft.UserControl):
             new_tracing_points -- MediaPipe Hands new landmarks for tracing points.\n
             right_hand_detected -- Boolean value to check, if right hand got detected.
             """
-            if self.images_only == True:
-                return
 
             if (right_hand_detected == True):
                 self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) 
@@ -244,7 +239,7 @@ class ExtractionVisualization(ft.UserControl):
                     os.mkdir(data_path)
 
                 # Create a mask for the hands and face
-                with mp_hands.Hands(min_detection_confidence=0.5, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.4, max_num_faces=1) as face_mesh:
+                with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.55, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.65, max_num_faces=1) as face_mesh:
                     number = 0
                     while True:
                         orig_path = "{}/{}".format(data_path, number)
@@ -289,7 +284,7 @@ class ExtractionVisualization(ft.UserControl):
             data_path = self.saving_directory
 
             # Create a mask for the hands and face
-            with mp_hands.Hands(min_detection_confidence=0.5, min_tracking_confidence=0.5, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.4, max_num_faces=1) as face_mesh:
+            with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.55, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.65, max_num_faces=1) as face_mesh:
                 number = 0
                 while True:
                     orig_path = "{}/{}".format(data_path, number)
@@ -376,6 +371,11 @@ class ExtractionVisualization(ft.UserControl):
                 self.image.update()
 
     def count_files(self, directory) -> int:
+        """Method to count files in the selected directory.
+        
+        Keyword arguments:\n
+        directory -- Directory where files are located and need to be counted.
+        """
         total_file_amount = 0
 
         for file in os.scandir(directory):

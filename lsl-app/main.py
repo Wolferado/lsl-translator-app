@@ -1,9 +1,9 @@
 import flet as ft
 
-from components.home_view import HomeScreen
-from components.recognition_view import RecognitionScreen
-from components.extraction_view import ExtractionScreen
-from components.recording_view import RecordingScreen
+from components.views.home_view import HomeScreen
+from components.views.recognition_view import RecognitionScreen
+from components.views.extraction_view import ExtractionScreen
+from components.views.recording_view import RecordingScreen
 
 def main(page: ft.Page):
     page.title = "LSL Prototype"

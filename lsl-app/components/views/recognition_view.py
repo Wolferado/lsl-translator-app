@@ -1,6 +1,6 @@
 import flet as ft
 
-from components.recognition_visualization import RecognitionVisualization
+from components.visualizations.recognition_visualization import RecognitionVisualization
 
 class RecognitionScreen(ft.UserControl):
     def build(self):
@@ -28,10 +28,12 @@ class RecognitionScreen(ft.UserControl):
 
         return ft.Column(
             alignment=ft.MainAxisAlignment.CENTER,
+            spacing=5,
             controls=[
                 self.app_title,
                 self.start_recognition_btn,
                 self.stop_teach_btn,
+                ft.Divider(),
                 self.recognition_placeholder
             ]   
         )

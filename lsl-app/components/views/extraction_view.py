@@ -1,6 +1,6 @@
 import flet as ft
 
-from components.extraction_visualization import ExtractionVisualization
+from components.visualizations.extraction_visualization import ExtractionVisualization
 
 class ExtractionScreen(ft.UserControl):
     def build(self):
@@ -8,7 +8,6 @@ class ExtractionScreen(ft.UserControl):
         self.data_saving_directory = None
         self.create_folders = True
         self.flip_frame = True
-        self.images_only = False
 
         self.get_data_extraction_directory_dialog = ft.FilePicker(on_result=self.get_data_extraction_directory)
         self.get_data_saving_directory_dialog = ft.FilePicker(on_result=self.get_data_saving_directory)
@@ -21,7 +20,7 @@ class ExtractionScreen(ft.UserControl):
 
         self.select_data_extraction_directory_btn = ft.ElevatedButton(
             text="Select directory to get data from",
-            icon=ft.icons.FOLDER,
+            icon=ft.icons.DRIVE_FOLDER_UPLOAD,
             on_click=lambda _: self.get_data_extraction_directory_dialog.get_directory_path(dialog_title="Select directory to retrieve the data from")
         )
         
@@ -43,13 +42,6 @@ class ExtractionScreen(ft.UserControl):
             value=True, 
             tooltip="Set to True, if you wish to record data from both original and flipped videos.",
             on_change=self.toggle_flip_video_bool
-        )
-
-        self.checkbox_images_only = ft.Checkbox(
-            label="Folder contains only images", 
-            value=False, 
-            tooltip="Set to True, if folder contains only images. Disables tracing.",
-            on_change=self.toggle_images_only_bool
         )
 
         self.start_data_extraction_btn = ft.ElevatedButton(
@@ -79,10 +71,10 @@ class ExtractionScreen(ft.UserControl):
                 self.get_data_saving_directory_dialog,
                 self.checkbox_create_new_folder,
                 self.checkbox_flip_video,
-                self.checkbox_images_only,
                 self.start_data_extraction_btn,
                 self.stop_data_extraction_btn,
-                self.data_extraction_placeholder
+                ft.Divider(),
+                self.data_extraction_placeholder,
             ]   
         )
     
@@ -117,11 +109,6 @@ class ExtractionScreen(ft.UserControl):
     def toggle_flip_video_bool(self, e):
         self.flip_frame = not self.flip_frame
 
-    def toggle_images_only_bool(self, e):
-        self.images_only = not self.images_only
-
-        print("Images only: ", self.images_only)
-
     def toggle_create_new_folders_bool(self, e):
         self.create_folders = not self.create_folders
 
@@ -132,14 +119,12 @@ class ExtractionScreen(ft.UserControl):
         self.select_data_saving_directory_btn.disabled = True
         self.checkbox_flip_video.disabled = True
         self.checkbox_create_new_folder.disabled = True
-        self.checkbox_images_only.disabled = True
 
         view = ExtractionVisualization()
         view.extraction_directory = self.data_extraction_directory
         view.saving_directory = self.data_saving_directory
         view.create_new_folders = self.create_folders
         view.flip_file = self.flip_frame
-        view.images_only = self.images_only
 
         self.data_extraction_placeholder.controls.append(view)
         self.update()
@@ -151,7 +136,6 @@ class ExtractionScreen(ft.UserControl):
         self.select_data_saving_directory_btn.disabled = False
         self.checkbox_flip_video.disabled = False
         self.checkbox_create_new_folder.disabled = False
-        self.checkbox_images_only.disabled = False
 
         self.data_extraction_placeholder.controls.clear()
         self.update()
