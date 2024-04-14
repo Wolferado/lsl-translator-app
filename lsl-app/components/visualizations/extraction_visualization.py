@@ -23,8 +23,9 @@ class ExtractionVisualization(ft.UserControl):
         self.image.width = 420
         self.image.height = 280
         self.cap = None
-        self.left_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
-        self.right_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
+        self.one_hand_tracing_points_amount = 9
+        self.left_hand_tracing_points_pos = np.repeat((np.zeros(self.one_hand_tracing_points_amount)), 5)
+        self.right_hand_tracing_points_pos = np.repeat((np.zeros(self.one_hand_tracing_points_amount)), 5)
         return self.image
 
     def did_mount(self):
@@ -74,8 +75,8 @@ class ExtractionVisualization(ft.UserControl):
         hand_results -- results of MediaPipe Hands model processing.\n
         face_results -- results of MediaPipe FaceMesh model processing.
         """
-        left_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(18), 5)]) # Array of left hand landmarks and tracing landmarks
-        right_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(18), 5)]) # Array of right hand landmarks and tracing landmarks
+        left_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(self.one_hand_tracing_points_amount), 5)]) # Array of left hand landmarks and tracing landmarks
+        right_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(self.one_hand_tracing_points_amount), 5)]) # Array of right hand landmarks and tracing landmarks
         face_points_pos = np.zeros(366) # Array of face landmarks. # 1404 - all landmarks, 366 - outer circle, eyebrows, eyes and mouth.
         face_selected_landmarks_indexes = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 215, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 
                                            46, 53, 52, 65, 55, 70, 63, 105, 66, 107, 
@@ -84,7 +85,8 @@ class ExtractionVisualization(ft.UserControl):
                                            362, 398, 384, 385, 386, 387, 388, 466, 253, 249, 390, 373, 374, 380, 381, 382,
                                            185, 40, 39, 37, 0, 267, 269, 270, 409, 375, 321, 405, 314, 17, 84, 181, 91, 146,
                                            80, 81, 82, 13, 312, 311, 310, 445, 318, 402, 317, 14, 87, 178, 95]
-        tracing_points_indexes = [0, 4, 8, 12, 16, 20] # Six points (wrist, thumb_tip, index_finger_tip, middle_finger_tip, ring_finger_tip, pinky_tip)
+        tracing_points_indexes = [0, 4, 8] # Three points (wrist, thumb_tip, index_finger_tip)
+        
 
         # Variables for hand statuses.
         self.right_hand_visible = False
@@ -108,9 +110,9 @@ class ExtractionVisualization(ft.UserControl):
             # Set boolean variables based on showed hands
             for hand in hand_results.multi_handedness:
                 if(hand.classification[0].label == "Left"): 
-                    self.right_hand_visible = True
-                if(hand.classification[0].label == "Right"): 
                     self.left_hand_visible = True
+                if(hand.classification[0].label == "Right"): 
+                    self.right_hand_visible = True
 
             # If left hand got detected
             if(self.left_hand_visible == True):
@@ -189,11 +191,11 @@ class ExtractionVisualization(ft.UserControl):
             """
 
             if (left_hand_detected == True):
-                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) 
-                self.left_hand_tracing_points_pos[:18] = new_tracing_points 
+                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, self.one_hand_tracing_points_amount) 
+                self.left_hand_tracing_points_pos[:self.one_hand_tracing_points_amount] = new_tracing_points 
             else:
-                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) 
-                self.left_hand_tracing_points_pos[:18] = np.zeros(18) 
+                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, self.one_hand_tracing_points_amount) 
+                self.left_hand_tracing_points_pos[:self.one_hand_tracing_points_amount] = np.zeros(self.one_hand_tracing_points_amount) 
 
     def update_right_hand_tracing_points(self, new_tracing_points, right_hand_detected):
             """Method to update tracing points array for right hand.\n
@@ -206,11 +208,11 @@ class ExtractionVisualization(ft.UserControl):
             """
 
             if (right_hand_detected == True):
-                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) 
-                self.right_hand_tracing_points_pos[:18] = new_tracing_points 
+                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, self.one_hand_tracing_points_amount) 
+                self.right_hand_tracing_points_pos[:self.one_hand_tracing_points_amount] = new_tracing_points 
             else :
-                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) 
-                self.right_hand_tracing_points_pos[:18] = np.zeros(18) 
+                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, self.one_hand_tracing_points_amount) 
+                self.right_hand_tracing_points_pos[:self.one_hand_tracing_points_amount] = np.zeros(self.one_hand_tracing_points_amount) 
 
     def begin_extraction(self):
         """Method to start extraction process."""
@@ -324,8 +326,8 @@ class ExtractionVisualization(ft.UserControl):
         hands_model -- MediaPipe Hands model.\n
         face_mesh_model -- MediaPipe FaceMesh model.
         """
-        self.left_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
-        self.right_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
+        self.left_hand_tracing_points_pos = np.repeat((np.zeros(self.one_hand_tracing_points_amount)), 5)
+        self.right_hand_tracing_points_pos = np.repeat((np.zeros(self.one_hand_tracing_points_amount)), 5)
 
         frame_number = 0
 
