@@ -13,6 +13,6 @@ __pycache__
 # Models (for development stage)
 /models
 # Script for testing stuff
-/test.py
+/test*
 # Image for alphabet
 LV-alfabets.jpg
