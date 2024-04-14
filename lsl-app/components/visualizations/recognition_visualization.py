@@ -22,8 +22,9 @@ class RecognitionVisualization(ft.UserControl):
         self.image.height = 280
         self.left_hand_visible = False
         self.right_hand_visible = False
-        self.left_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
-        self.right_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
+        self.one_hand_tracing_points_amount = 9
+        self.left_hand_tracing_points_pos = np.repeat((np.zeros(self.one_hand_tracing_points_amount)), 5)
+        self.right_hand_tracing_points_pos = np.repeat((np.zeros(self.one_hand_tracing_points_amount)), 5)
 
         self.left_hand_detected_icon = ft.Icon(name=ft.icons.BACK_HAND_OUTLINED, color=ft.colors.GREY)
         self.face_detected_icon = ft.Icon(name=ft.icons.TAG_FACES_OUTLINED, color=ft.colors.GREY)
@@ -84,8 +85,8 @@ class RecognitionVisualization(ft.UserControl):
 
         # Clear all sequence and tracing points variables.
         self.sequence = []
-        self.left_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
-        self.right_hand_tracing_points_pos = np.repeat((np.zeros(18)), 5)
+        self.left_hand_tracing_points_pos = np.repeat((np.zeros(self.one_hand_tracing_points_amount)), 5)
+        self.right_hand_tracing_points_pos = np.repeat((np.zeros(self.one_hand_tracing_points_amount)), 5)
 
         # If ML model is Random Forest
         if self.dropdown_menu.value == "Random Forest":
@@ -171,13 +172,19 @@ class RecognitionVisualization(ft.UserControl):
                 result = self.model.predict(np.expand_dims(self.sequence, axis=0))[0] # Get result by parsing expanded sequence array 
                 print(np.expand_dims(self.sequence, axis=0).shape) # (1, 30, 672)
                 print(np.array(self.sequence).shape) # (30, 672)
-                if (result[np.argmax(result)] >= self.model_threshold):
+
+                if (result[np.argmax(result)] >= self.model_threshold): # If letters exceed needed threshold, output it
                     print("Prob: {}, symbol #{} - {}".format(result[np.argmax(result)], result.argmax(axis=-1), letters[np.argmax(result)]))
                     self.text_field.value = "{}".format(letters[np.argmax(result)])
                     self.text_field.update()
                     self.sequence = []
-                else:
-                    print("Prob: {}, symbol #{} - {}. INSUFFICIENT PROBABILTY.".format(result[np.argmax(result)], result.argmax(axis=-1), letters[np.argmax(result)]))
+                elif (letters[np.argmax(result)] == "_"): # Don't add threshold, if it is blank symbol
+                    print("Prob: {}, symbol #{} - {}".format(result[np.argmax(result)], result.argmax(axis=-1), letters[np.argmax(result)]))
+                    self.text_field.value = "{}".format(letters[np.argmax(result)])
+                    self.text_field.update()
+                    self.sequence = []
+                else: # Otherwise output notification about insufficient probability
+                    print("Prob: {}, symbol #{} - {}. INSUFFICIENT PROBABILITY.".format(result[np.argmax(result)], result.argmax(axis=-1), letters[np.argmax(result)]))
                     self.sequence = []
 
 
@@ -256,8 +263,8 @@ class RecognitionVisualization(ft.UserControl):
         hand_results -- results of MediaPipe Hands model processing.\n
         face_results -- results of MediaPipe FaceMesh model processing.
         """
-        left_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(18), 5)]) # Array of left hand landmarks and tracing landmarks
-        right_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(18), 5)]) # Array of right hand landmarks and tracing landmarks
+        left_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(self.one_hand_tracing_points_amount), 5)]) # Array of left hand landmarks and tracing landmarks
+        right_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(self.one_hand_tracing_points_amount), 5)]) # Array of right hand landmarks and tracing landmarks
         face_points_pos = np.zeros(366) # Array of face landmarks. # 1404 - all landmarks, 366 - outer circle, eyebrows, eyes and mouth.
         face_selected_landmarks_indexes = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 215, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 
                                            46, 53, 52, 65, 55, 70, 63, 105, 66, 107, 
@@ -266,7 +273,7 @@ class RecognitionVisualization(ft.UserControl):
                                            362, 398, 384, 385, 386, 387, 388, 466, 253, 249, 390, 373, 374, 380, 381, 382,
                                            185, 40, 39, 37, 0, 267, 269, 270, 409, 375, 321, 405, 314, 17, 84, 181, 91, 146,
                                            80, 81, 82, 13, 312, 311, 310, 445, 318, 402, 317, 14, 87, 178, 95]
-        tracing_points_indexes = [0, 4, 8, 12, 16, 20] # Six points (wrist, thumb_tip, index_finger_tip, middle_finger_tip, ring_finger_tip, pinky_tip)
+        tracing_points_indexes = [0, 4, 8] # Three points (wrist, thumb_tip, index_finger_tip)
 
         # Variables for hand statuses.
         self.right_hand_visible = False
@@ -371,11 +378,11 @@ class RecognitionVisualization(ft.UserControl):
             """
 
             if (left_hand_detected == True):
-                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) 
-                self.left_hand_tracing_points_pos[:18] = new_tracing_points 
+                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, self.one_hand_tracing_points_amount) 
+                self.left_hand_tracing_points_pos[:self.one_hand_tracing_points_amount] = new_tracing_points 
             else:
-                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, 18) 
-                self.left_hand_tracing_points_pos[:18] = np.zeros(18) 
+                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, self.one_hand_tracing_points_amount) 
+                self.left_hand_tracing_points_pos[:self.one_hand_tracing_points_amount] = np.zeros(self.one_hand_tracing_points_amount) 
 
     def update_right_hand_tracing_points(self, new_tracing_points, right_hand_detected):
             """Method to update tracing points array for right hand.\n
@@ -388,8 +395,8 @@ class RecognitionVisualization(ft.UserControl):
             """
 
             if (right_hand_detected == True):
-                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) 
-                self.right_hand_tracing_points_pos[:18] = new_tracing_points 
+                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, self.one_hand_tracing_points_amount) 
+                self.right_hand_tracing_points_pos[:self.one_hand_tracing_points_amount] = new_tracing_points 
             else :
-                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, 18) 
-                self.right_hand_tracing_points_pos[:18] = np.zeros(18) 
+                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, self.one_hand_tracing_points_amount) 
+                self.right_hand_tracing_points_pos[:self.one_hand_tracing_points_amount] = np.zeros(self.one_hand_tracing_points_amount) 
