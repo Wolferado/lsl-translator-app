@@ -18,13 +18,13 @@ import matplotlib.pyplot as plt
 
 class ModelCreator():
     def __init__(self):
-        self.directory = os.path.join(os.curdir, "sign_data")
+        self.directory = os.path.join(os.curdir, "sign_data_wall")
         self.teached_symbols = symbols_lib
         self.sign_folders = os.listdir(self.directory) # All folders
         #self.sign_folders = ['a', 'b', 'c'] # For testing purposes
         self.max_frame_amount = 30
         self.face_points_amount = 366 # 1404 - whole face, 366 - limited face
-        self.hand_points_amount = 108 # 63 - not traceable, 153 - traceable (6 points), 108 traceable (3 points)
+        self.hand_points_amount = 63 # 63 - not traceable, 153 - traceable (6 points), 108 traceable (3 points)
         self.X_data = None
         self.Y_data = None
         self.test_size = 0.05
@@ -51,30 +51,30 @@ class ModelCreator():
         self.lstm_model_compile()
         self.save_lstm_model_and_graphs()
 
-        self.simplernn_model_compile()
-        self.save_simplernn_model_and_graphs()
+        # self.simplernn_model_compile()
+        # self.save_simplernn_model_and_graphs()
         
-        self.random_forest_compile_and_save()
+        # self.random_forest_compile_and_save()
 
         # TEST SIZE: 0.15
-        self.test_size = 0.15
-        self.lstm_model_compile()
-        self.save_lstm_model_and_graphs()
+        # self.test_size = 0.15
+        # self.lstm_model_compile()
+        # self.save_lstm_model_and_graphs()
 
-        self.simplernn_model_compile()
-        self.save_simplernn_model_and_graphs()
+        # self.simplernn_model_compile()
+        # self.save_simplernn_model_and_graphs()
         
-        self.random_forest_compile_and_save()
+        # self.random_forest_compile_and_save()
 
-        # TEST SIZE: 0.40
-        self.test_size = 0.40
-        self.lstm_model_compile()
-        self.save_lstm_model_and_graphs()
+        # # TEST SIZE: 0.40
+        # self.test_size = 0.40
+        # self.lstm_model_compile()
+        # self.save_lstm_model_and_graphs()
 
-        self.simplernn_model_compile()
-        self.save_simplernn_model_and_graphs()
+        # self.simplernn_model_compile()
+        # self.save_simplernn_model_and_graphs()
         
-        self.random_forest_compile_and_save()
+        # self.random_forest_compile_and_save()
 
     def get_data_from_directory(self):
         labels_enum = {label:num for num, label in enumerate(self.sign_folders)}
@@ -107,11 +107,11 @@ class ModelCreator():
                     # data_collection.append(data) # Append data to sequence of defined letter or word
                     labels.append(labels_enum[data_folder]) # Append name of the folder along with its index
 
-        # joblib.dump(data_collection, 'sign_data_revised_new_tracing_mirrored.joblib') # Save data to stop endless pointless extraction
+        # joblib.dump(data_collection, 'sign_data_wall_no_tracing.joblib') # Save data to stop endless pointless extraction
 
         print(datetime.now(), ": Processing finished", "(last folder processed in {})".format(datetime.now() - last_time)) # For debugging
 
-        sign_data = joblib.load('sign_data_new.joblib')
+        sign_data = joblib.load('sign_data_wall_no_tracing.joblib')
 
         self.X_data = np.array(sign_data) # 3D array of all data from frames. [file[frames[data]]]
         self.Y_data = to_categorical(labels) # 2D array for categories in both 
