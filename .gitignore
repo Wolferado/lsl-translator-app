@@ -13,6 +13,12 @@ __pycache__
 # Models (for development stage)
 /models
 # Script for testing stuff
-/test.py
+/test*
 # Image for alphabet
 LV-alfabets.jpg
+# Folder for the build
+/lsl-app/build
+# Files for stats (CSV mainly)
+*.csv
+# Libraries list for distribution purposes
+_requirements.txt

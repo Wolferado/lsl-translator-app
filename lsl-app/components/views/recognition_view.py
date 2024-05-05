@@ -11,14 +11,14 @@ class RecognitionScreen(ft.UserControl):
         )
 
         self.start_recognition_btn = ft.ElevatedButton(
-            text="Start Recognition",
+            text='Launch "Recognition"',
             icon=ft.icons.FACE_UNLOCK_ROUNDED,
             visible=True,
             on_click=self.start_recognition
         )
         
         self.stop_teach_btn = ft.ElevatedButton(
-            text="Stop Recognition",
+            text='Close "Recognition"',
             icon=ft.icons.FACE_RETOUCHING_OFF,
             visible=False,
             on_click=self.stop_recognition
@@ -56,7 +56,7 @@ class RecognitionScreen(ft.UserControl):
         self.update()
 
     def stop_recognition(self, e):
-        self.start_recognition_btn.text = "Start Recognition"
+        self.start_recognition_btn.text = 'Launch "Recognition"'
         self.start_recognition_btn.visible = True
         self.stop_teach_btn.visible = False
 
