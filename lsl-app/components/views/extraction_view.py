@@ -1,4 +1,5 @@
 import flet as ft
+import os
 
 from components.visualizations.extraction_visualization import ExtractionVisualization
 
@@ -6,7 +7,7 @@ class ExtractionScreen(ft.UserControl):
     def build(self):
         self.data_extraction_directory = None
         self.data_saving_directory = None
-        self.create_folders = True
+        self.create_folders = False
         self.flip_frame = True
 
         self.get_data_extraction_directory_dialog = ft.FilePicker(on_result=self.get_data_extraction_directory)
@@ -31,9 +32,9 @@ class ExtractionScreen(ft.UserControl):
         )
 
         self.checkbox_create_new_folder = ft.Checkbox(
-            label="Create new folder for each sign", 
-            value=True, 
-            tooltip="Creates new folder for each subfolder in the selected directory in saving directory. Disable, if you wish to only add data to existing directory.",
+            label="Create new folder for each sign?", 
+            tooltip="(Automatic) Checked - creates new folder for each subfolder in the selected directory in saving directory.",
+            disabled=True,
             on_change=self.toggle_create_new_folders_bool
         )
 
@@ -84,6 +85,13 @@ class ExtractionScreen(ft.UserControl):
 
         if self.data_extraction_directory:
             self.select_data_extraction_directory_btn.text = "Extraction directory selected: ...\\{}\\{}".format(self.data_extraction_directory.rsplit('\\', 2)[-2], self.data_extraction_directory.rsplit('\\', 2)[-1])
+            if(self.has_subdirectory(self.data_extraction_directory)):
+                self.checkbox_create_new_folder.value = True
+                self.create_folders = True
+            else:
+                self.checkbox_create_new_folder.value = False
+                self.create_folders = False
+
         else:
             self.select_data_extraction_directory_btn.text = "Select directory to get data from"
 
@@ -112,13 +120,20 @@ class ExtractionScreen(ft.UserControl):
     def toggle_create_new_folders_bool(self, e):
         self.create_folders = not self.create_folders
 
+    # Method to check if directory has other directories
+    def has_subdirectory(self, directory):
+        for folder in os.listdir(directory):
+            if os.path.isdir(os.path.join(directory, folder)):
+                return True
+        
+        return False
+
     def start_extraction(self, e):
         self.start_data_extraction_btn.visible = False
         self.stop_data_extraction_btn.visible = True
         self.select_data_extraction_directory_btn.disabled = True
         self.select_data_saving_directory_btn.disabled = True
         self.checkbox_flip_video.disabled = True
-        self.checkbox_create_new_folder.disabled = True
 
         view = ExtractionVisualization()
         view.extraction_directory = self.data_extraction_directory
@@ -135,7 +150,6 @@ class ExtractionScreen(ft.UserControl):
         self.select_data_extraction_directory_btn.disabled = False
         self.select_data_saving_directory_btn.disabled = False
         self.checkbox_flip_video.disabled = False
-        self.checkbox_create_new_folder.disabled = False
 
         self.data_extraction_placeholder.controls.clear()
         self.update()
