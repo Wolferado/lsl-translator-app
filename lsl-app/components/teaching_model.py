@@ -47,10 +47,9 @@ class ModelCreator():
         # self.model_compile(model_name="GRU", value_to_monitor="val_loss", min_delta_value=0.01, mode_option="min", starting_epoch=50, optimizer_name="adam", num_of_epochs=175)
         # self.save_model_and_graphs("GRU")
 
-        self.k_fold_cross_validation(model_name="RNN", value_to_monitor="loss", min_delta_value=0.01, mode_option="min", starting_epoch=30, optimizer_name="nadam", num_of_splits=3, num_of_epochs=150)
-        self.k_fold_cross_validation(model_name="LSTM", value_to_monitor="loss", min_delta_value=0.01, mode_option="min", starting_epoch=50, optimizer_name="adam", num_of_splits=3, num_of_epochs=200)
-        self.k_fold_cross_validation(model_name="GRU", value_to_monitor="loss", min_delta_value=0.01, mode_option="min", starting_epoch=40, optimizer_name="adam", num_of_splits=3, num_of_epochs=175)
-
+        # self.k_fold_cross_validation(model_name="RNN", value_to_monitor="loss", min_delta_value=0.01, mode_option="min", starting_epoch=30, optimizer_name="nadam", num_of_splits=3, num_of_epochs=150)
+        # self.k_fold_cross_validation(model_name="LSTM", value_to_monitor="loss", min_delta_value=0.01, mode_option="min", starting_epoch=50, optimizer_name="adam", num_of_splits=3, num_of_epochs=200)
+        # self.k_fold_cross_validation(model_name="GRU", value_to_monitor="loss", min_delta_value=0.01, mode_option="min", starting_epoch=40, optimizer_name="adam", num_of_splits=3, num_of_epochs=175)
 
     def get_data_from_directory(self):
         signs_labels_enum = {label:num for num, label in enumerate(self.sign_folders)}
@@ -93,6 +92,12 @@ class ModelCreator():
         self.Y_data = to_categorical(signs_labels) # 2D array for categories in both 
 
     def create_model(self, model_name: str) -> Sequential:
+        """Method to create a Keras Machine Learning model.\n
+            Returns Keras model of specified Machine Learning algorithm.
+
+            Keyword arguments:\n
+            model_name -- name of supervised machine learning algorithm fitted for sequential data classification.\n
+        """
         model = None
         
         if(model_name == "RNN"):
@@ -125,6 +130,17 @@ class ModelCreator():
         return model
 
     def model_compile(self, model_name: str, value_to_monitor: str, min_delta_value: float, mode_option: str, starting_epoch: int, optimizer_name: str, num_of_epochs: int):
+        """Method to compile a Keras Machine Learning model.\n
+
+            Keyword arguments:\n
+            model_name -- name of supervised machine learning algorithm fitted for sequential data classifcation.\n
+            value_to_monitor -- name of the value that needs to be tracked during Machine Learning process.\n
+            min_delta_value -- amount of delta needed to account for valid progress.\n
+            mode_option -- option of the mode (what to track, to min or to max value progress).\n
+            starting_epoch -- from which epoch start EarlyStopping.\n
+            optimizer_name -- name of the optimizer used in Machine Learning.\n
+            num_of_epochs -- number of epochs for Machine Learning process.\n
+        """
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.X_data, self.Y_data, test_size=self.test_size)
         
         self.model = self.create_model(model_name)
@@ -147,6 +163,11 @@ class ModelCreator():
         self.model.summary()
 
     def save_model_and_graphs(self, model_name):
+        """Method to save a Keras Machine Learning model and its graphs (learning curves, confusion matrix and model architecture).\n
+
+            Keyword arguments:\n
+            model_name -- name of supervised machine learning algorithm fitted for sequential data classification.\n
+        """
         # Accuracy graph
         plt.plot(self.history.history['categorical_accuracy'], color='#0277bd')
         plt.plot(self.history.history['val_categorical_accuracy'], linestyle='dashed', color='#f77500')
@@ -186,6 +207,19 @@ class ModelCreator():
         fig, ax = plt.subplots(figsize=(8, 6))
  
     def k_fold_cross_validation(self, model_name: str, value_to_monitor: str, min_delta_value: float, mode_option: str, starting_epoch: int, optimizer_name: str, num_of_splits: int, num_of_epochs: int):
+        """Method to perform k-fold cross validation on Keras Machine Learning model.\n
+
+            Keyword arguments:\n
+            model_name -- name of supervised machine learning algorithm fitted for sequential data classifcation.\n
+            value_to_monitor -- name of the value that needs to be tracked during Machine Learning process.\n
+            min_delta_value -- amount of delta needed to account for valid progress.\n
+            mode_option -- option of the mode (what to track, to min or to max value progress).\n
+            starting_epoch -- from which epoch start EarlyStopping.\n
+            optimizer_name -- name of the optimizer used in Machine Learning.\n
+            num_of_splits -- number of splits for data during k-fold cross validation. Also specifies a number how many times cross validation will be performed with different set of validation data sets.\n
+            num_of_epochs -- number of epochs for Machine Learning process.\n
+        """
+        
         self.model = self.create_model(model_name)
 
         early_stop = EarlyStopping(
