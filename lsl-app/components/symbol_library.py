@@ -1,4 +1,4 @@
-symbols_lib = [
+signs_lib = [
     'a',
     'ah', 
     'b', 

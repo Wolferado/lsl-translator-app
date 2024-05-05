@@ -2,16 +2,17 @@ from sklearn.model_selection import train_test_split
 from keras.utils import to_categorical
 from keras.callbacks import EarlyStopping
 from keras.models import Sequential
-from keras.layers import LSTM, Dense, SimpleRNN, Dropout, Input
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, log_loss, confusion_matrix, ConfusionMatrixDisplay
+from keras.layers import LSTM, Dense, SimpleRNN, GRU, Dropout, Input
+from keras.metrics import Precision, Recall, F1Score, AUC
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.model_selection import KFold
 from keras.saving import save_model
 from keras.utils import plot_model
-from symbol_library import symbols_lib
-
+from symbol_library import signs_lib
 
 import joblib
 import os
+import csv
 from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,15 +20,15 @@ import matplotlib.pyplot as plt
 class ModelCreator():
     def __init__(self):
         self.directory = os.path.join(os.curdir, "sign_data")
-        self.teached_symbols = symbols_lib
+        self.signs_to_learn = signs_lib
         self.sign_folders = os.listdir(self.directory) # All folders
-        #self.sign_folders = ['a', 'b', 'c'] # For testing purposes
         self.max_frame_amount = 30
         self.face_points_amount = 366 # 1404 - whole face, 366 - limited face
         self.hand_points_amount = 108 # 63 - not traceable, 153 - traceable (6 points), 108 traceable (3 points)
         self.X_data = None
         self.Y_data = None
         self.test_size = 0.05
+        self.k_fold_random_seed = 10
         self.model = None
         self.history = None
         self.main()
@@ -36,53 +37,28 @@ class ModelCreator():
         # Extract data from materials in the directory
         self.get_data_from_directory()
 
-        # TEST SIZE: 0.05
-        # self.test_size=0.05
-        # self.lstm_model_compile()
-        # self.save_lstm_model_and_graphs()
+        # self.test_size = 0.40
+        # self.model_compile(model_name="RNN", value_to_monitor="val_loss", min_delta_value=0.01, mode_option="min", starting_epoch=40, optimizer_name="adam", num_of_epochs=150)
+        # self.save_model_and_graphs("RNN")
 
-        # self.simplernn_model_compile()
-        # self.save_simplernn_model_and_graphs()
-        
-        # self.random_forest_compile_and_save()
+        # self.model_compile(model_name="LSTM", value_to_monitor="val_loss", min_delta_value=0.01, mode_option="min", starting_epoch=60, optimizer_name="adam", num_of_epochs=200)
+        # self.save_model_and_graphs("LSTM")
 
-        # TEST SIZE: 0.10
-        self.test_size = 0.10
-        self.lstm_model_compile()
-        self.save_lstm_model_and_graphs()
+        # self.model_compile(model_name="GRU", value_to_monitor="val_loss", min_delta_value=0.01, mode_option="min", starting_epoch=50, optimizer_name="adam", num_of_epochs=175)
+        # self.save_model_and_graphs("GRU")
 
-        self.simplernn_model_compile()
-        self.save_simplernn_model_and_graphs()
-        
-        self.random_forest_compile_and_save()
+        self.k_fold_cross_validation(model_name="RNN", value_to_monitor="loss", min_delta_value=0.01, mode_option="min", starting_epoch=30, optimizer_name="nadam", num_of_splits=3, num_of_epochs=150)
+        self.k_fold_cross_validation(model_name="LSTM", value_to_monitor="loss", min_delta_value=0.01, mode_option="min", starting_epoch=50, optimizer_name="adam", num_of_splits=3, num_of_epochs=200)
+        self.k_fold_cross_validation(model_name="GRU", value_to_monitor="loss", min_delta_value=0.01, mode_option="min", starting_epoch=40, optimizer_name="adam", num_of_splits=3, num_of_epochs=175)
 
-        # TEST SIZE: 0.15
-        self.test_size = 0.15
-        self.lstm_model_compile()
-        self.save_lstm_model_and_graphs()
-
-        self.simplernn_model_compile()
-        self.save_simplernn_model_and_graphs()
-        
-        self.random_forest_compile_and_save()
-
-        # TEST SIZE: 0.40
-        self.test_size = 0.40
-        self.lstm_model_compile()
-        self.save_lstm_model_and_graphs()
-
-        self.simplernn_model_compile()
-        self.save_simplernn_model_and_graphs()
-        
-        self.random_forest_compile_and_save()
 
     def get_data_from_directory(self):
-        labels_enum = {label:num for num, label in enumerate(self.sign_folders)}
+        signs_labels_enum = {label:num for num, label in enumerate(self.sign_folders)}
 
-        print("Enumerated labels: ", labels_enum)
+        print("Signs and their indexes: ", signs_labels_enum)
 
-        data_collection = []
-        labels = []
+        sign_data_collection = []
+        signs_labels = []
 
         last_time = datetime.now()
 
@@ -90,7 +66,7 @@ class ModelCreator():
             print(datetime.now(), ": Processing ", data_folder, " (previous folder processed in {})".format(datetime.now() - last_time)) # For debugging
             last_time = datetime.now()
             for sub_folder in os.listdir(os.path.join(self.directory, data_folder)): # For each subfolder in the folder of the sign_folders
-                data = [] # Array to store the values
+                sign_data = [] # Array to store the values
                 invalid_data = False
 
                 for frame in range(0, self.max_frame_amount): # From 1st until maximum allowed frame
@@ -98,203 +74,153 @@ class ModelCreator():
 
                     if (os.path.isfile(current_file) and os.path.getsize(current_file) > 0):
                         pass
-                        # res = np.load(current_file) # Get info from that .npy file
-                        # data.append(res) # And append it to the window
+                        # file_data = np.load(current_file) # Get info from .npy file
+                        # data.append(file_data) # And append it to the window
                     else: 
                         invalid_data = True
 
                 if invalid_data == False: # If there are data in the array
-                    # data_collection.append(data) # Append data to sequence of defined letter or word
-                    labels.append(labels_enum[data_folder]) # Append name of the folder along with its index
+                    # sign_data_collection.append(sign_data) # Append data to sequence of defined letter or word
+                    signs_labels.append(signs_labels_enum[data_folder]) # Append name of the folder along with its index
 
-        # joblib.dump(data_collection, 'sign_data_revised_new_tracing_mirrored.joblib') # Save data to stop endless pointless extraction
+        # joblib.dump(data_collection, 'sign_data_new.joblib') # Save data to stop endless pointless extraction upon each start
 
         print(datetime.now(), ": Processing finished", "(last folder processed in {})".format(datetime.now() - last_time)) # For debugging
 
         sign_data = joblib.load('sign_data_new.joblib')
 
         self.X_data = np.array(sign_data) # 3D array of all data from frames. [file[frames[data]]]
-        self.Y_data = to_categorical(labels) # 2D array for categories in both 
+        self.Y_data = to_categorical(signs_labels) # 2D array for categories in both 
 
-    def lstm_model_compile(self):
+    def create_model(self, model_name: str) -> Sequential:
+        model = None
+        
+        if(model_name == "RNN"):
+            model = Sequential([
+                Input(shape=(self.max_frame_amount, (self.face_points_amount + 2 * self.hand_points_amount))),
+                SimpleRNN(128, return_sequences=True, activation='relu'),
+                SimpleRNN(128, return_sequences=False, activation='relu'),
+                Dense(np.array(self.sign_folders).shape[0], activation='softmax') # Layer that contains all possible outputs
+            ])
+        elif (model_name == "LSTM"):
+            model = Sequential([
+                Input(shape=(self.max_frame_amount, (self.face_points_amount + 2 * self.hand_points_amount))), # 1530 - non-traceable, 1710 - traceable
+                LSTM(128, return_sequences=True, activation='sigmoid'),
+                Dropout(0.2),
+                LSTM(128, return_sequences=False, activation='sigmoid'),
+                Dropout(0.1),
+                Dense(np.array(self.sign_folders).shape[0], activation='softmax') # Layer that contains all possible outputs
+            ])
+        elif (model_name == "GRU"):
+            model = Sequential([
+                Input(shape=(self.max_frame_amount, (self.face_points_amount + 2 * self.hand_points_amount))), # 1530 - non-traceable, 1710 - traceable
+                GRU(128, return_sequences=True, activation='sigmoid'),
+                GRU(128, return_sequences=False, activation='sigmoid'),
+                Dense(np.array(self.sign_folders).shape[0], activation='softmax') # Layer that contains all possible outputs
+            ])
+        else:
+            exception_msg = "There is no types of ML models for '{}'. Check definition and try again.".format(model_name)
+            raise ValueError(exception_msg)
+
+        return model
+
+    def model_compile(self, model_name: str, value_to_monitor: str, min_delta_value: float, mode_option: str, starting_epoch: int, optimizer_name: str, num_of_epochs: int):
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.X_data, self.Y_data, test_size=self.test_size)
-
-        #print(self.X_data.shape)
-        #print(self.Y_data.shape)
-
-        self.model = Sequential([
-            Input(shape=(self.max_frame_amount, (self.face_points_amount + 2 * self.hand_points_amount))), # 1530 - non-traceable, 1710 - traceable
-            LSTM(128, return_sequences=True, activation='sigmoid'),
-            Dropout(0.3),
-            LSTM(128, return_sequences=False, activation='sigmoid'),
-            Dense(np.array(self.sign_folders).shape[0], activation='softmax') # Layer that contains all possible outputs
-        ])
+        
+        self.model = self.create_model(model_name)
 
         early_stop = EarlyStopping(
-            monitor="val_loss",
-            min_delta=0.005,
+            monitor=value_to_monitor,
+            min_delta=min_delta_value,
+            patience=15,
+            verbose=0,
+            mode=mode_option,
+            baseline=None,
+            restore_best_weights=True,
+            start_from_epoch=starting_epoch
+        )
+
+        self.model.compile(optimizer=optimizer_name, loss='categorical_crossentropy', metrics=['categorical_accuracy'])
+
+        self.history = self.model.fit(self.x_train, self.y_train, epochs=num_of_epochs, validation_data=(self.x_test, self.y_test), callbacks=[early_stop])
+
+        self.model.summary()
+
+    def save_model_and_graphs(self, model_name):
+        # Accuracy graph
+        plt.plot(self.history.history['categorical_accuracy'], color='#0277bd')
+        plt.plot(self.history.history['val_categorical_accuracy'], linestyle='dashed', color='#f77500')
+        plt.legend(['accuracy', 'val_accuracy'])
+        plt.title('{} model categorical accuracy overtime (test_size - {})'.format(model_name, self.test_size))
+        plt.xlabel('epoch')
+        plt.ylabel('categorical_accuracy')
+        plt.savefig("{} - Accuracy (test_size - {}).png".format(model_name, self.test_size))
+        plt.clf()
+
+        # Loss graph
+        plt.plot(self.history.history['loss'], color='#0277bd')
+        plt.plot(self.history.history['val_loss'], linestyle='dashed', color='#f77500')
+        plt.legend(['loss', 'val_loss'])
+        plt.title('{} model loss overtime (test_size:{})'.format(model_name, self.test_size))
+        plt.xlabel('epoch')
+        plt.ylabel('loss')
+        plt.savefig("{} - Loss (test_size - {}).png".format(model_name, self.test_size))
+        plt.clf()
+
+        ypred = self.model.predict(self.x_test)
+        ytrue = np.argmax(self.y_test, axis=1).tolist()
+        ypred = np.argmax(ypred, axis=1).tolist()
+        conf_matrix = confusion_matrix(ypred, ytrue)
+
+        # Confusion Matrix plot
+        fig, ax = plt.subplots(figsize=(15, 15))
+        conf_matrix_figure = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=self.signs_to_learn)
+        conf_matrix_figure.plot(cmap=plt.cm.YlOrRd, ax=ax)
+        plt.title('{} model confusion matrix (test_size - {})'.format(model_name, self.test_size))
+        plt.savefig("{} - Confusion Matrix (test_size - {}).png".format(model_name, self.test_size))
+        plt.clf()
+
+        plot_model(model=self.model, to_file='{}_model_structure.png'.format(model_name), show_shapes=True)
+        save_model(self.model, '{}_model_({}).keras'.format(model_name, self.test_size))
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+ 
+    def k_fold_cross_validation(self, model_name: str, value_to_monitor: str, min_delta_value: float, mode_option: str, starting_epoch: int, optimizer_name: str, num_of_splits: int, num_of_epochs: int):
+        self.model = self.create_model(model_name)
+
+        early_stop = EarlyStopping(
+            monitor=value_to_monitor,
+            min_delta=min_delta_value,
             patience=10,
             verbose=0,
-            mode="min",
+            mode=mode_option,
             baseline=None,
             restore_best_weights=True,
-            start_from_epoch=75,
+            start_from_epoch=starting_epoch
         )
 
-        self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
-
-        self.history = self.model.fit(self.x_train, self.y_train, epochs=200, validation_data=(self.x_test, self.y_test), callbacks=[early_stop])
+        self.model.compile(optimizer=optimizer_name, loss='categorical_crossentropy', metrics=['categorical_accuracy', Precision(), Recall(), F1Score(average="weighted"), AUC()])
 
         self.model.summary()
 
-    def simplernn_model_compile(self):
-        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.X_data, self.Y_data, test_size=self.test_size)
+        kfold = KFold(n_splits=num_of_splits, shuffle=True, random_state=self.k_fold_random_seed)
 
-        #print(self.X_data.shape)
-        #print(self.Y_data.shape)
-        
-        self.model = Sequential([
-            Input(shape=(self.max_frame_amount, (self.face_points_amount + 2 * self.hand_points_amount))),
-            SimpleRNN(128, return_sequences=True, activation='relu'),
-            Dropout(0.2),
-            SimpleRNN(64, return_sequences=False, activation='relu'),
-            Dense(np.array(self.sign_folders).shape[0], activation='softmax') # Layer that contains all possible outputs
-        ])
+        for train, test in kfold.split(self.X_data, self.Y_data):
+            self.model.fit(self.X_data[train], self.Y_data[train], epochs=num_of_epochs, callbacks=[early_stop])
+            self.history = self.model.evaluate(self.X_data[test], self.Y_data[test], return_dict=True)
+            accuracy_score = self.history['categorical_accuracy']
+            precision_score = self.history['precision']
+            recall_score = self.history['recall']
+            f1score_score = self.history['f1_score']
+            auc_score = self.history['auc']
 
-        early_stop = EarlyStopping(
-            monitor="val_loss",
-            min_delta=0.005,
-            patience=20,
-            verbose=0,
-            mode="min",
-            baseline=None,
-            restore_best_weights=True,
-            start_from_epoch=80,
-        )
+            headers = ["Accuracy", "Precision", "Recall", "F1", "AUC ROC", "Date"]
 
-        self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
-
-        self.history = self.model.fit(self.x_train, self.y_train, epochs=200, validation_data=(self.x_test, self.y_test), callbacks=[early_stop])
-
-        self.model.summary()
-
-    def save_lstm_model_and_graphs(self):
-        # Accuracy graph
-        plt.plot(self.history.history['categorical_accuracy'], color='#0277bd')
-        plt.plot(self.history.history['val_categorical_accuracy'], linestyle='dashed', color='#f77500')
-        plt.legend(['accuracy', 'val_accuracy'])
-        plt.title('LSTM model categorical accuracy overtime (test_size - {})'.format(self.test_size))
-        plt.xlabel('epoch')
-        plt.ylabel('categorical_accuracy')
-        plt.savefig("LSTM - Accuracy (test_size - {}).png".format(self.test_size))
-        plt.clf()
-
-        # Loss graph
-        plt.plot(self.history.history['loss'], color='#0277bd')
-        plt.plot(self.history.history['val_loss'], linestyle='dashed', color='#f77500')
-        plt.legend(['loss', 'val_loss'])
-        plt.title('LSTM model loss overtime (test_size - {})'.format(self.test_size))
-        plt.xlabel('epoch')
-        plt.ylabel('loss')
-        plt.savefig("LSTM - Loss (test_size - {}).png".format(self.test_size))
-        plt.clf()
-
-        ypred = self.model.predict(self.x_test)
-        ytrue = np.argmax(self.y_test, axis=1).tolist()
-        ypred = np.argmax(ypred, axis=1).tolist()
-        conf_matrix = confusion_matrix(ypred, ytrue)
-
-        # Confusion Matrix plot
-        fig, ax = plt.subplots(figsize=(15, 15))
-        conf_matrix_figure = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=self.teached_symbols)
-        conf_matrix_figure.plot(cmap=plt.cm.YlOrRd, ax=ax)
-        plt.title('LSTM model confusion matrix (test_size - {})'.format(self.test_size))
-        plt.savefig("LSTM - Confusion Matrix (test_size - {}).png".format(self.test_size))
-        plt.clf()
-
-        plot_model(model=self.model, to_file='lstm_model_structure.png', show_shapes=True)
-        save_model(self.model, 'lstm_model_({}).keras'.format(self.test_size))
-
-        fig, ax = plt.subplots(figsize=(8, 6))
-
-    def save_simplernn_model_and_graphs(self):
-        # Accuracy graph
-        plt.plot(self.history.history['categorical_accuracy'], color='#0277bd')
-        plt.plot(self.history.history['val_categorical_accuracy'], linestyle='dashed', color='#f77500')
-        plt.legend(['accuracy', 'val_accuracy'])
-        plt.title('RNN model categorical accuracy overtime (test_size - {})'.format(self.test_size))
-        plt.xlabel('epoch')
-        plt.ylabel('categorical_accuracy')
-        plt.savefig("RNN - Accuracy (test_size - {}).png".format(self.test_size))
-        plt.clf()
-
-        # Loss graph
-        plt.plot(self.history.history['loss'], color='#0277bd')
-        plt.plot(self.history.history['val_loss'], linestyle='dashed', color='#f77500')
-        plt.legend(['loss', 'val_loss'])
-        plt.title('RNN model loss overtime (test_size:{})'.format(self.test_size))
-        plt.xlabel('epoch')
-        plt.ylabel('loss')
-        plt.savefig("RNN - Loss (test_size - {}).png".format(self.test_size))
-        plt.clf()
-
-        ypred = self.model.predict(self.x_test)
-        ytrue = np.argmax(self.y_test, axis=1).tolist()
-        ypred = np.argmax(ypred, axis=1).tolist()
-        conf_matrix = confusion_matrix(ypred, ytrue)
-
-        # Confusion Matrix plot
-        fig, ax = plt.subplots(figsize=(15, 15))
-        conf_matrix_figure = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=self.teached_symbols)
-        conf_matrix_figure.plot(cmap=plt.cm.YlOrRd, ax=ax)
-        plt.title('RNN model confusion matrix (test_size - {})'.format(self.test_size))
-        plt.savefig("RNN - Confusion Matrix (test_size - {}).png".format(self.test_size))
-        plt.clf()
-
-        plot_model(model=self.model, to_file='simplernn_model_structure.png', show_shapes=True)
-        save_model(self.model, 'rnn_model_({}).keras'.format(self.test_size))
-
-        fig, ax = plt.subplots(figsize=(8, 6))
-
-    def random_forest_compile_and_save(self):
-        # Reshaping 3D array, so it will be 2D array with first column being the same with Y_data.
-        X_data = self.X_data
-        X_data = X_data.reshape(X_data.shape[0], X_data.shape[1] * X_data.shape[2])
-
-        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(X_data, self.Y_data, test_size=self.test_size)
-
-        print(self.X_data.shape) # (2010, 30, 672)
-        print(X_data.shape) # (2010, 20160)
-        print(self.Y_data.shape) # (2010, 34)
-
-        number_of_trees = 30
-        self.model = RandomForestClassifier(n_estimators=number_of_trees, criterion="gini", warm_start=True)
-
-        self.history = self.model.fit(self.x_train, self.y_train)
-
-        y_predict = self.model.predict(self.x_test)
-
-        print("Accuracy score: ", accuracy_score(self.y_test, y_predict))
-        print("Log loss: ", log_loss(self.y_test, y_predict))
-
-        # Create the confusion matrix
-        ypred = self.model.predict(self.x_test)
-        ytrue = np.argmax(self.y_test, axis=1).tolist()
-        ypred = np.argmax(ypred, axis=1).tolist()
-        conf_matrix = confusion_matrix(ypred, ytrue)
-
-        # Confusion Matrix plot
-        fig, ax = plt.subplots(figsize=(15, 15))
-        conf_matrix_figure = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=self.teached_symbols)
-        conf_matrix_figure.plot(cmap=plt.cm.YlOrRd, ax=ax)
-        plt.title('Random Forest model confusion matrix (test_size - {})'.format(self.test_size))
-        plt.savefig("Random Forest - Confusion Matrix (test_size - {}).png".format(self.test_size))
-        plt.clf()
-
-        file_name = "random_forest_model_(trees - {}, test_size - {}, acc - {}, loss - {}).joblib".format(number_of_trees, self.test_size, round(accuracy_score(self.y_test, y_predict), 2), round(log_loss(self.y_test, y_predict), 2))
-        joblib.dump(self.model, file_name)
-
-        fig, ax = plt.subplots(figsize=(8, 6))
+            with open('ML_Results_{}.csv'.format(model_name), 'a') as file:
+                writer = csv.DictWriter(file, fieldnames=headers)
+                if os.stat('ML_Results_{}.csv'.format(model_name)).st_size == 0:
+                    writer.writeheader()
+                writer.writerows([{'Accuracy': accuracy_score, 'Precision': precision_score, 'Recall': recall_score, 'F1': f1score_score, 'AUC ROC': auc_score, 'Date': datetime.now()}])
 
     def count_files(self, directory) -> int:
         total_file_amount = 0
