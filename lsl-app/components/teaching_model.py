@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 class ModelCreator():
     def __init__(self):
         self.directory = os.path.join(os.curdir, "sign_data")
-        self.signs_to_learn = signs_lib
+        self.signs_to_learn = list(signs_lib.keys())
         self.sign_folders = os.listdir(self.directory) # All folders
         self.max_frame_amount = 30
         self.face_points_amount = 366 # 1404 - whole face, 366 - limited face
@@ -162,7 +162,7 @@ class ModelCreator():
 
         self.model.summary()
 
-    def save_model_and_graphs(self, model_name):
+    def save_model_and_graphs(self, model_name: str):
         """Method to save a Keras Machine Learning model and its graphs (learning curves, confusion matrix and model architecture).\n
 
             Keyword arguments:\n
