@@ -17,7 +17,7 @@ class HomeScreen(ft.UserControl):
             padding=20
         )
         self.logo = ft.Container(
-            content=ft.Image(src=f"../assets/icons/fav_icon.png", width=75, height=75),
+            content=ft.Image(src=f"../assets/icon.png", width=75, height=75),
             padding=0,
             alignment=ft.alignment.center
         )
