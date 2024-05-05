@@ -8,23 +8,26 @@ import os # To access model file
 import joblib
 import numpy as np
 
+from components.symbol_library import signs_lib
+
 mp_hands = mp.solutions.hands # Load the solution from mediapipe library
 mp_face_mesh = mp.solutions.face_mesh # Load the solution from mediapipe library
 mp_drawing = mp.solutions.drawing_utils # Enabling drawing utilities from MediaPipe library
 mp_drawing_styles = mp.solutions.drawing_styles
 
-letters = ['a', 'ā', 'b', 'c', 'č', 'd', 'e', 'ē', 'f', 'g', 'ģ', 'h', 'i', 'ī', 'j', 'k', 'ķ', 'l', 'ļ', 'm', 'n', 'ņ', 'o', 'p', 'r', 's', 'š', 't', 'u', 'ū', 'v', 'z', 'ž', '_'] # All folders
+signs = list(signs_lib.keys())
 
 class RecognitionVisualization(ft.UserControl):
     def build(self):
         self.image = ft.Image()
         self.image.width = 420
         self.image.height = 280
+        self.repeated_recognition_times = 0
         self.left_hand_visible = False
         self.right_hand_visible = False
-        self.one_hand_tracing_points_amount = 9
-        self.left_hand_tracing_points_pos = np.repeat((np.zeros(self.one_hand_tracing_points_amount)), 5)
-        self.right_hand_tracing_points_pos = np.repeat((np.zeros(self.one_hand_tracing_points_amount)), 5)
+        self.one_hand_tracing_points_coordinates_amount = 9
+        self.left_hand_tracing_points_pos = np.repeat((np.zeros(self.one_hand_tracing_points_coordinates_amount)), 5)
+        self.right_hand_tracing_points_pos = np.repeat((np.zeros(self.one_hand_tracing_points_coordinates_amount)), 5)
 
         self.left_hand_detected_icon = ft.Icon(name=ft.icons.BACK_HAND_OUTLINED, color=ft.colors.GREY)
         self.face_detected_icon = ft.Icon(name=ft.icons.TAG_FACES_OUTLINED, color=ft.colors.GREY)
@@ -35,6 +38,17 @@ class RecognitionVisualization(ft.UserControl):
         self.icon_row = ft.Row(
             controls=[self.left_hand_detected_icon, self.face_detected_icon, self.right_hand_detected_icon]
         )
+
+        self.clear_btn = ft.FilledTonalButton(
+            text="Clear recognized text",
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=10),
+                padding=2
+            ),
+            icon=ft.icons.DELETE_OUTLINE_ROUNDED,
+            on_click=self.clear_textfield
+        )
+
         self.dropdown_menu = ft.Dropdown(
             value="LSTM",
             autofocus=False,
@@ -43,13 +57,13 @@ class RecognitionVisualization(ft.UserControl):
             options=[
                 ft.dropdown.Option("RNN"),
                 ft.dropdown.Option("LSTM"),
-                ft.dropdown.Option("Random Forest")
+                ft.dropdown.Option("GRU"),
             ],
             on_change=self.on_dropdown_change
         )
 
-        self.icon_row_and_dropdown_container = ft.Row(
-            controls=[self.icon_row, self.dropdown_menu],
+        self.icon_row_and_control_elements = ft.Row(
+            controls=[self.icon_row, self.clear_btn, self.dropdown_menu],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN
         )
 
@@ -66,7 +80,7 @@ class RecognitionVisualization(ft.UserControl):
 
         return ft.Column(
             alignment=ft.alignment.center,
-            controls=[self.image, self.icon_row_and_dropdown_container, self.text_field]
+            controls=[self.image, self.icon_row_and_control_elements, self.text_field]
         )
     
     def did_mount(self): 
@@ -81,24 +95,21 @@ class RecognitionVisualization(ft.UserControl):
         self.detect_hands_and_face()
 
     def on_dropdown_change(self, e):
-        """Method to call when Machine Learning model is changed."""
+        """Method to call when Sign Language recognition model is changed."""
 
         # Clear all sequence and tracing points variables.
         self.sequence = []
-        self.left_hand_tracing_points_pos = np.repeat((np.zeros(self.one_hand_tracing_points_amount)), 5)
-        self.right_hand_tracing_points_pos = np.repeat((np.zeros(self.one_hand_tracing_points_amount)), 5)
+        self.left_hand_tracing_points_pos = np.repeat((np.zeros(self.one_hand_tracing_points_coordinates_amount)), 5)
+        self.right_hand_tracing_points_pos = np.repeat((np.zeros(self.one_hand_tracing_points_coordinates_amount)), 5)
 
-        # If ML model is Random Forest
-        if self.dropdown_menu.value == "Random Forest":
-            self.model_name = self.dropdown_menu.value
-            self.model = joblib.load((os.path.join(os.getcwd(), 'lsl-app', 'models', "random_forest_model.joblib")))
-
-        # If ML model is something else
-        else: 
-            self.model_name = "{}_model".format(str.lower(self.dropdown_menu.value))
-            self.model = keras.models.load_model(os.path.join(os.getcwd(), 'lsl-app', 'models', "{}.keras".format(self.model_name)))
+        # Load selected model for further sign recognition
+        self.model_name = "{}_model".format(str.lower(self.dropdown_menu.value))
+        self.model = keras.models.load_model(os.path.join(os.getcwd(), 'lsl-app', 'models', "{}.keras".format(self.model_name)))
 
         # Clear text field
+        self.clear_textfield()
+
+    def clear_textfield(self, e=None):
         self.text_field.value = ""
         self.text_field.update()
 
@@ -119,8 +130,6 @@ class RecognitionVisualization(ft.UserControl):
                 image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
                 # self.draw_landmarks(image, hand_results, face_results)
-
-                #self.draw_landmarks(image, hand_results, face_results)
                 self.process_landmarks(hand_results, face_results)
                 self.update_icon_row(hand_results, face_results)
 
@@ -153,40 +162,45 @@ class RecognitionVisualization(ft.UserControl):
 
         self.sequence.append(self.extract_landmarks(hand_results, face_results)) # Append extracted landmark information to the sequence
 
-        if(len(self.sequence) == 30): # If sequence contains information about 30 frames
-            if(self.model_name == "Random Forest"): # If Random Forest ML model is selected
-                print(np.array(self.sequence).shape) # (30, 672)
-                print(np.array(self.sequence).shape[0]) # 30
-                self.sequence = np.expand_dims(self.sequence, axis=0)
-                self.sequence = self.sequence.reshape(self.sequence.shape[0], self.sequence.shape[1] * self.sequence.shape[2]) # Reshape sequence array for ML model
-                print(self.sequence.shape) # (1, 20160)
+        if(len(self.sequence) >= 32): # If sequence contains information about 30 frames
+            result = self.model.predict(np.expand_dims(self.sequence[-30:], axis=0))[0] # Get result by parsing expanded sequence array 
+            print(np.expand_dims(self.sequence, axis=0).shape) # (1, 30, 672)
+            print(np.array(self.sequence).shape) # (30, 672)
 
-                result = self.model.predict(self.sequence)[0] # Get the result
-                print("Prob: {}, symbol #{} - {}".format(result[np.argmax(result)], result.argmax(axis=-1), letters[np.argmax(result)]))
-                self.sequence = []
+            if (signs[np.argmax(result)] == "_"): # Don't add threshold, if it is blank symbol
+                print("Prob: {}, symbol #{} - {}".format(result[np.argmax(result)], result.argmax(axis=-1), signs[np.argmax(result)]))
+                if(len(self.text_field.value) == 0 or (self.text_field.value[-2:] == ". " and len(self.text_field.value) > 1)):
+                    pass
+                elif(self.text_field.value[-1:] != "_"): # For continuation
+                    self.text_field.value = self.text_field.value + "_"
+                elif(self.text_field.value[-2:] == " _" and len(self.text_field.value) > 1): # For ending point
+                    self.text_field.value = self.text_field.value[:-2] + '. '
+                elif(self.text_field.value[-1:] == "_"):
+                    self.text_field.value = self.text_field.value[:-1] + '. '
 
-                self.text_field.value = "{}".format(letters[np.argmax(result)])
                 self.text_field.update()
+                self.sequence = []
+                self.repeated_recognition_times = 0
+            elif (result[np.argmax(result)] >= self.model_threshold): # If letters exceed needed threshold, output it
+                print("Prob: {}, symbol #{} - {}".format(result[np.argmax(result)], result.argmax(axis=-1), signs_lib[signs[np.argmax(result)]]))
+                if (self.text_field.value[-1:] == "_"):
+                    self.text_field.value = self.text_field.value[:-1]
+                
+                if (len(signs_lib[signs[np.argmax(result)]]) == 1):
+                    self.text_field.value = self.text_field.value + "{}".format(signs_lib[signs[np.argmax(result)]])
+                else:
+                    self.text_field.value = self.text_field.value + "{} ".format(signs_lib[signs[np.argmax(result)]])
 
-            else:
-                result = self.model.predict(np.expand_dims(self.sequence, axis=0))[0] # Get result by parsing expanded sequence array 
-                print(np.expand_dims(self.sequence, axis=0).shape) # (1, 30, 672)
-                print(np.array(self.sequence).shape) # (30, 672)
-
-                if (result[np.argmax(result)] >= self.model_threshold): # If letters exceed needed threshold, output it
-                    print("Prob: {}, symbol #{} - {}".format(result[np.argmax(result)], result.argmax(axis=-1), letters[np.argmax(result)]))
-                    self.text_field.value = "{}".format(letters[np.argmax(result)])
-                    self.text_field.update()
-                    self.sequence = []
-                elif (letters[np.argmax(result)] == "_"): # Don't add threshold, if it is blank symbol
-                    print("Prob: {}, symbol #{} - {}".format(result[np.argmax(result)], result.argmax(axis=-1), letters[np.argmax(result)]))
-                    self.text_field.value = "{}".format(letters[np.argmax(result)])
-                    self.text_field.update()
-                    self.sequence = []
-                else: # Otherwise output notification about insufficient probability
-                    print("Prob: {}, symbol #{} - {}. INSUFFICIENT PROBABILITY.".format(result[np.argmax(result)], result.argmax(axis=-1), letters[np.argmax(result)]))
-                    self.sequence = []
-
+                self.text_field.update()
+                self.sequence = []
+                self.repeated_recognition_times = 0
+            elif (result[np.argmax(result)] < self.model_threshold and self.repeated_recognition_times < 5): # Repeat for 5 times to be sure
+                self.repeated_recognition_times += 1
+                print("Repeat")
+            else: # Otherwise output notification about insufficient probability
+                print("Prob: {}, symbol #{} - {}. INSUFFICIENT PROBABILITY.".format(result[np.argmax(result)], result.argmax(axis=-1), signs[np.argmax(result)]))
+                self.sequence = []
+                self.repeated_recognition_times = 0
 
     def update_icon_row(self, hand_results, face_results):
         # Draw face landmarks, if any
@@ -263,8 +277,8 @@ class RecognitionVisualization(ft.UserControl):
         hand_results -- results of MediaPipe Hands model processing.\n
         face_results -- results of MediaPipe FaceMesh model processing.
         """
-        left_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(self.one_hand_tracing_points_amount), 5)]) # Array of left hand landmarks and tracing landmarks
-        right_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(self.one_hand_tracing_points_amount), 5)]) # Array of right hand landmarks and tracing landmarks
+        left_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(self.one_hand_tracing_points_coordinates_amount), 5)]) # Array of left hand landmarks and tracing landmarks
+        right_hand_points_pos = np.concatenate([np.zeros(63), np.repeat(np.zeros(self.one_hand_tracing_points_coordinates_amount), 5)]) # Array of right hand landmarks and tracing landmarks
         face_points_pos = np.zeros(366) # Array of face landmarks. # 1404 - all landmarks, 366 - outer circle, eyebrows, eyes and mouth.
         face_selected_landmarks_indexes = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 215, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 
                                            46, 53, 52, 65, 55, 70, 63, 105, 66, 107, 
@@ -372,31 +386,31 @@ class RecognitionVisualization(ft.UserControl):
             Shifts tracing point array to the right for one element and adds one at the first index.
 
             Keyword arguments:\n
-            hand_tracing_points_data -- MediaPipe Hands landmarks [0, 4, 8, 12, 16, 20] tracing points collection.\n
+            hand_tracing_points_data -- MediaPipe Hands landmarks [0, 4, 8] tracing points collection.\n
             new_tracing_points -- MediaPipe Hands new landmarks for tracing points.\n
             left_hand_detected -- Boolean value to check, if left hand got detected.
             """
 
             if (left_hand_detected == True):
-                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, self.one_hand_tracing_points_amount) 
-                self.left_hand_tracing_points_pos[:self.one_hand_tracing_points_amount] = new_tracing_points 
+                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, self.one_hand_tracing_points_coordinates_amount) 
+                self.left_hand_tracing_points_pos[:self.one_hand_tracing_points_coordinates_amount] = new_tracing_points 
             else:
-                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, self.one_hand_tracing_points_amount) 
-                self.left_hand_tracing_points_pos[:self.one_hand_tracing_points_amount] = np.zeros(self.one_hand_tracing_points_amount) 
+                self.left_hand_tracing_points_pos = np.roll(self.left_hand_tracing_points_pos, self.one_hand_tracing_points_coordinates_amount) 
+                self.left_hand_tracing_points_pos[:self.one_hand_tracing_points_coordinates_amount] = np.zeros(self.one_hand_tracing_points_coordinates_amount) 
 
     def update_right_hand_tracing_points(self, new_tracing_points, right_hand_detected):
             """Method to update tracing points array for right hand.\n
             Shifts tracing point array to the right for one element and adds one at the first index.
 
             Keyword arguments:\n
-            hand_tracing_points_data -- MediaPipe Hands landmarks [0, 4, 8, 12, 16, 20] tracing points collection.\n
+            hand_tracing_points_data -- MediaPipe Hands landmarks [0, 4, 8] tracing points collection.\n
             new_tracing_points -- MediaPipe Hands new landmarks for tracing points.\n
             right_hand_detected -- Boolean value to check, if right hand got detected.
             """
 
             if (right_hand_detected == True):
-                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, self.one_hand_tracing_points_amount) 
-                self.right_hand_tracing_points_pos[:self.one_hand_tracing_points_amount] = new_tracing_points 
+                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, self.one_hand_tracing_points_coordinates_amount) 
+                self.right_hand_tracing_points_pos[:self.one_hand_tracing_points_coordinates_amount] = new_tracing_points 
             else :
-                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, self.one_hand_tracing_points_amount) 
-                self.right_hand_tracing_points_pos[:self.one_hand_tracing_points_amount] = np.zeros(self.one_hand_tracing_points_amount) 
+                self.right_hand_tracing_points_pos = np.roll(self.right_hand_tracing_points_pos, self.one_hand_tracing_points_coordinates_amount) 
+                self.right_hand_tracing_points_pos[:self.one_hand_tracing_points_coordinates_amount] = np.zeros(self.one_hand_tracing_points_coordinates_amount) 
