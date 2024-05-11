@@ -2,7 +2,7 @@ from sklearn.model_selection import train_test_split
 from keras.utils import to_categorical
 from keras.callbacks import EarlyStopping
 from keras.models import Sequential
-from keras.layers import LSTM, Dense, SimpleRNN, GRU, Dropout, Input
+from keras.layers import LSTM, Dense, SimpleRNN, GRU, Dropout, Input, GaussianNoise
 from keras.metrics import Precision, Recall, F1Score, AUC
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.model_selection import KFold
@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 
 class ModelCreator():
     def __init__(self):
-        self.directory = os.path.join(os.curdir, "sign_data")
+        self.directory = os.path.join(os.curdir, "sign_data_full_collection")
         self.signs_to_learn = list(signs_lib.keys())
         self.sign_folders = os.listdir(self.directory) # All folders
         self.max_frame_amount = 30
@@ -27,8 +27,7 @@ class ModelCreator():
         self.hand_points_amount = 108 # 63 - not traceable, 153 - traceable (6 points), 108 traceable (3 points)
         self.X_data = None
         self.Y_data = None
-        self.test_size = 0.05
-        self.k_fold_random_seed = 10
+        self.test_size = 0.35
         self.model = None
         self.history = None
         self.main()
@@ -37,19 +36,21 @@ class ModelCreator():
         # Extract data from materials in the directory
         self.get_data_from_directory()
 
-        # self.test_size = 0.40
-        # self.model_compile(model_name="RNN", value_to_monitor="val_loss", min_delta_value=0.01, mode_option="min", starting_epoch=40, optimizer_name="adam", num_of_epochs=150)
+        # Test size
+        # self.test_size = 0.35
+
+        # self.model_compile(model_name="RNN", value_to_monitor="val_loss", min_delta_value=0.1, mode_option="min", starting_epoch=40, optimizer_name="nadam", num_of_epochs=150)
         # self.save_model_and_graphs("RNN")
 
-        # self.model_compile(model_name="LSTM", value_to_monitor="val_loss", min_delta_value=0.01, mode_option="min", starting_epoch=60, optimizer_name="adam", num_of_epochs=200)
+        # self.model_compile(model_name="LSTM", value_to_monitor="val_loss", min_delta_value=0.1, mode_option="min", starting_epoch=60, optimizer_name="adam", num_of_epochs=200)
         # self.save_model_and_graphs("LSTM")
 
-        # self.model_compile(model_name="GRU", value_to_monitor="val_loss", min_delta_value=0.01, mode_option="min", starting_epoch=50, optimizer_name="adam", num_of_epochs=175)
+        # self.model_compile(model_name="GRU", value_to_monitor="val_loss", min_delta_value=0.1, mode_option="min", starting_epoch=50, optimizer_name="adam", num_of_epochs=175)
         # self.save_model_and_graphs("GRU")
 
-        # self.k_fold_cross_validation(model_name="RNN", value_to_monitor="loss", min_delta_value=0.01, mode_option="min", starting_epoch=30, optimizer_name="nadam", num_of_splits=3, num_of_epochs=150)
-        # self.k_fold_cross_validation(model_name="LSTM", value_to_monitor="loss", min_delta_value=0.01, mode_option="min", starting_epoch=50, optimizer_name="adam", num_of_splits=3, num_of_epochs=200)
-        # self.k_fold_cross_validation(model_name="GRU", value_to_monitor="loss", min_delta_value=0.01, mode_option="min", starting_epoch=40, optimizer_name="adam", num_of_splits=3, num_of_epochs=175)
+        # self.k_fold_cross_validation(model_name="RNN", value_to_monitor="loss", min_delta_value=0.3, mode_option="min", starting_epoch=30, optimizer_name="nadam", num_of_splits=5, num_of_epochs=150)
+        self.k_fold_cross_validation(model_name="LSTM", value_to_monitor="loss", min_delta_value=0.3, mode_option="min", starting_epoch=50, optimizer_name="adam", num_of_splits=5, num_of_epochs=200)
+        # self.k_fold_cross_validation(model_name="GRU", value_to_monitor="loss", min_delta_value=0.3, mode_option="min", starting_epoch=40, optimizer_name="adam", num_of_splits=5, num_of_epochs=175)
 
     def get_data_from_directory(self):
         signs_labels_enum = {label:num for num, label in enumerate(self.sign_folders)}
@@ -72,21 +73,23 @@ class ModelCreator():
                     current_file = os.path.join(self.directory, data_folder, sub_folder, "{}.npy".format(frame)) # From each .npy file
 
                     if (os.path.isfile(current_file) and os.path.getsize(current_file) > 0):
-                        pass
+                        pass 
+                        # !! Comment once finished gathering the data
                         # file_data = np.load(current_file) # Get info from .npy file
-                        # data.append(file_data) # And append it to the window
+                        # sign_data.append(file_data) # And append it to the window
                     else: 
                         invalid_data = True
 
                 if invalid_data == False: # If there are data in the array
-                    # sign_data_collection.append(sign_data) # Append data to sequence of defined letter or word
+                    sign_data_collection.append(sign_data) # Append data to sequence of defined letter or word
                     signs_labels.append(signs_labels_enum[data_folder]) # Append name of the folder along with its index
 
-        # joblib.dump(data_collection, 'sign_data_new.joblib') # Save data to stop endless pointless extraction upon each start
+        # !! Comment once finished gathering the data
+        # joblib.dump(sign_data_collection, 'sign_data_full.joblib') # Save data to stop endless pointless extraction upon each start 
 
         print(datetime.now(), ": Processing finished", "(last folder processed in {})".format(datetime.now() - last_time)) # For debugging
 
-        sign_data = joblib.load('sign_data_new.joblib')
+        sign_data = joblib.load('sign_data_full.joblib')
 
         self.X_data = np.array(sign_data) # 3D array of all data from frames. [file[frames[data]]]
         self.Y_data = to_categorical(signs_labels) # 2D array for categories in both 
@@ -103,23 +106,26 @@ class ModelCreator():
         if(model_name == "RNN"):
             model = Sequential([
                 Input(shape=(self.max_frame_amount, (self.face_points_amount + 2 * self.hand_points_amount))),
-                SimpleRNN(128, return_sequences=True, activation='relu'),
-                SimpleRNN(128, return_sequences=False, activation='relu'),
+                SimpleRNN(48, return_sequences=True, activation='relu'),
+                GaussianNoise(0.25),
+                SimpleRNN(48, return_sequences=False, activation='relu'),
                 Dense(np.array(self.sign_folders).shape[0], activation='softmax') # Layer that contains all possible outputs
             ])
         elif (model_name == "LSTM"):
             model = Sequential([
                 Input(shape=(self.max_frame_amount, (self.face_points_amount + 2 * self.hand_points_amount))), # 1530 - non-traceable, 1710 - traceable
                 LSTM(128, return_sequences=True, activation='sigmoid'),
+                GaussianNoise(0.2),
+                LSTM(128, return_sequences=True, activation='sigmoid'),
                 Dropout(0.2),
                 LSTM(128, return_sequences=False, activation='sigmoid'),
-                Dropout(0.1),
                 Dense(np.array(self.sign_folders).shape[0], activation='softmax') # Layer that contains all possible outputs
             ])
         elif (model_name == "GRU"):
             model = Sequential([
                 Input(shape=(self.max_frame_amount, (self.face_points_amount + 2 * self.hand_points_amount))), # 1530 - non-traceable, 1710 - traceable
                 GRU(128, return_sequences=True, activation='sigmoid'),
+                GaussianNoise(0.25),
                 GRU(128, return_sequences=False, activation='sigmoid'),
                 Dense(np.array(self.sign_folders).shape[0], activation='softmax') # Layer that contains all possible outputs
             ])
@@ -175,6 +181,7 @@ class ModelCreator():
         plt.title('{} model categorical accuracy overtime (test_size - {})'.format(model_name, self.test_size))
         plt.xlabel('epoch')
         plt.ylabel('categorical_accuracy')
+        plt.grid()
         plt.savefig("{} - Accuracy (test_size - {}).png".format(model_name, self.test_size))
         plt.clf()
 
@@ -185,6 +192,7 @@ class ModelCreator():
         plt.title('{} model loss overtime (test_size:{})'.format(model_name, self.test_size))
         plt.xlabel('epoch')
         plt.ylabel('loss')
+        plt.grid()
         plt.savefig("{} - Loss (test_size - {}).png".format(model_name, self.test_size))
         plt.clf()
 
@@ -198,6 +206,7 @@ class ModelCreator():
         conf_matrix_figure = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=self.signs_to_learn)
         conf_matrix_figure.plot(cmap=plt.cm.YlOrRd, ax=ax)
         plt.title('{} model confusion matrix (test_size - {})'.format(model_name, self.test_size))
+        plt.setp(ax.get_xticklabels(), rotation=90, ha="center", rotation_mode="default")
         plt.savefig("{} - Confusion Matrix (test_size - {}).png".format(model_name, self.test_size))
         plt.clf()
 
@@ -237,7 +246,7 @@ class ModelCreator():
 
         self.model.summary()
 
-        kfold = KFold(n_splits=num_of_splits, shuffle=True, random_state=self.k_fold_random_seed)
+        kfold = KFold(n_splits=num_of_splits, shuffle=True)
 
         for train, test in kfold.split(self.X_data, self.Y_data):
             self.model.fit(self.X_data[train], self.Y_data[train], epochs=num_of_epochs, callbacks=[early_stop])

@@ -2,20 +2,17 @@
 Notes.md
 # Videos for alphabet learning
 /signs_*
+/some_words
 # Sign data (both alphabet and other in the future)
 /*sign_data*
 # Environment variables
 .env
-# TensorFlow logs
-/logs
 # PyCache files
 __pycache__
 # Models (for development stage)
 /models
 # Script for testing stuff
 /test*
-# Image for alphabet
-LV-alfabets.jpg
 # Folder for the build
 /lsl-app/build
 # Files for stats (CSV mainly)

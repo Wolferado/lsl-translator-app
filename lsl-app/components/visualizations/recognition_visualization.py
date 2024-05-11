@@ -33,7 +33,7 @@ class RecognitionVisualization(ft.UserControl):
         self.face_detected_icon = ft.Icon(name=ft.icons.TAG_FACES_OUTLINED, color=ft.colors.GREY)
         self.right_hand_detected_icon = ft.Icon(name=ft.icons.FRONT_HAND_OUTLINED, color=ft.colors.GREY)
         
-        self.model_threshold = 0.65
+        self.model_threshold = 0.80
 
         self.icon_row = ft.Row(
             controls=[self.left_hand_detected_icon, self.face_detected_icon, self.right_hand_detected_icon]
@@ -69,6 +69,7 @@ class RecognitionVisualization(ft.UserControl):
 
         self.text_field = ft.TextField(
             label="Text Recognition",
+            read_only=True,
             value=""
         )
 
@@ -162,7 +163,7 @@ class RecognitionVisualization(ft.UserControl):
 
         self.sequence.append(self.extract_landmarks(hand_results, face_results)) # Append extracted landmark information to the sequence
 
-        if(len(self.sequence) >= 32): # If sequence contains information about 30 frames
+        if(len(self.sequence) >= 35): # If sequence contains information about 35 frames and more
             result = self.model.predict(np.expand_dims(self.sequence[-30:], axis=0))[0] # Get result by parsing expanded sequence array 
             print(np.expand_dims(self.sequence, axis=0).shape) # (1, 30, 672)
             print(np.array(self.sequence).shape) # (30, 672)
@@ -178,9 +179,10 @@ class RecognitionVisualization(ft.UserControl):
                 elif(self.text_field.value[-1:] == "_"):
                     self.text_field.value = self.text_field.value[:-1] + '. '
 
-                self.text_field.update()
+                # self.text_field.update()
                 self.sequence = []
                 self.repeated_recognition_times = 0
+                self.cleanup_textfield()
             elif (result[np.argmax(result)] >= self.model_threshold): # If letters exceed needed threshold, output it
                 print("Prob: {}, symbol #{} - {}".format(result[np.argmax(result)], result.argmax(axis=-1), signs_lib[signs[np.argmax(result)]]))
                 if (self.text_field.value[-1:] == "_"):
@@ -189,18 +191,26 @@ class RecognitionVisualization(ft.UserControl):
                 if (len(signs_lib[signs[np.argmax(result)]]) == 1):
                     self.text_field.value = self.text_field.value + "{}".format(signs_lib[signs[np.argmax(result)]])
                 else:
-                    self.text_field.value = self.text_field.value + "{} ".format(signs_lib[signs[np.argmax(result)]])
+                    self.text_field.value = self.text_field.value + " {} ".format(signs_lib[signs[np.argmax(result)]])
 
-                self.text_field.update()
+                # self.text_field.update()
                 self.sequence = []
                 self.repeated_recognition_times = 0
+                self.cleanup_textfield()
             elif (result[np.argmax(result)] < self.model_threshold and self.repeated_recognition_times < 5): # Repeat for 5 times to be sure
                 self.repeated_recognition_times += 1
                 print("Repeat")
             else: # Otherwise output notification about insufficient probability
-                print("Prob: {}, symbol #{} - {}. INSUFFICIENT PROBABILITY.".format(result[np.argmax(result)], result.argmax(axis=-1), signs[np.argmax(result)]))
+                print("Prob: {}, symbol #{} - {}. (low prob., no display).".format(result[np.argmax(result)], result.argmax(axis=-1), signs[np.argmax(result)]))
                 self.sequence = []
                 self.repeated_recognition_times = 0
+
+    def cleanup_textfield(self):
+        if(len(self.text_field.value) > 45):
+            while(len(self.text_field.value) > 40):
+                words = self.text_field.value.split( )
+                self.text_field.value = " ".join(words[1:])
+                self.text_field.update()
 
     def update_icon_row(self, hand_results, face_results):
         # Draw face landmarks, if any
