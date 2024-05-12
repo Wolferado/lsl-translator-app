@@ -39,7 +39,7 @@ class ModelCreator():
         # Test size
         # self.test_size = 0.35
 
-        # self.model_compile(model_name="RNN", value_to_monitor="val_loss", min_delta_value=0.1, mode_option="min", starting_epoch=40, optimizer_name="nadam", num_of_epochs=150)
+        # self.model_compile(model_name="RNN", value_to_monitor="val_loss", min_delta_value=0.1, mode_option="min", starting_epoch=110, optimizer_name="adam", num_of_epochs=150)
         # self.save_model_and_graphs("RNN")
 
         # self.model_compile(model_name="LSTM", value_to_monitor="val_loss", min_delta_value=0.1, mode_option="min", starting_epoch=60, optimizer_name="adam", num_of_epochs=200)
@@ -48,9 +48,9 @@ class ModelCreator():
         # self.model_compile(model_name="GRU", value_to_monitor="val_loss", min_delta_value=0.1, mode_option="min", starting_epoch=50, optimizer_name="adam", num_of_epochs=175)
         # self.save_model_and_graphs("GRU")
 
-        # self.k_fold_cross_validation(model_name="RNN", value_to_monitor="loss", min_delta_value=0.3, mode_option="min", starting_epoch=30, optimizer_name="nadam", num_of_splits=5, num_of_epochs=150)
-        self.k_fold_cross_validation(model_name="LSTM", value_to_monitor="loss", min_delta_value=0.3, mode_option="min", starting_epoch=50, optimizer_name="adam", num_of_splits=5, num_of_epochs=200)
-        # self.k_fold_cross_validation(model_name="GRU", value_to_monitor="loss", min_delta_value=0.3, mode_option="min", starting_epoch=40, optimizer_name="adam", num_of_splits=5, num_of_epochs=175)
+        # self.k_fold_cross_validation(model_name="RNN", value_to_monitor="loss", min_delta_value=0.3, mode_option="min", starting_epoch=110, optimizer_name="adam", num_of_splits=5, num_of_epochs=150)
+        # self.k_fold_cross_validation(model_name="LSTM", value_to_monitor="loss", min_delta_value=0.3, mode_option="min", starting_epoch=60, optimizer_name="adam", num_of_splits=5, num_of_epochs=200)
+        # self.k_fold_cross_validation(model_name="GRU", value_to_monitor="loss", min_delta_value=0.3, mode_option="min", starting_epoch=50, optimizer_name="adam", num_of_splits=5, num_of_epochs=175)
 
     def get_data_from_directory(self):
         signs_labels_enum = {label:num for num, label in enumerate(self.sign_folders)}
@@ -107,8 +107,8 @@ class ModelCreator():
             model = Sequential([
                 Input(shape=(self.max_frame_amount, (self.face_points_amount + 2 * self.hand_points_amount))),
                 SimpleRNN(48, return_sequences=True, activation='relu'),
-                GaussianNoise(0.25),
-                SimpleRNN(48, return_sequences=False, activation='relu'),
+                GaussianNoise(0.15),
+                SimpleRNN(32, return_sequences=False, activation='relu'),
                 Dense(np.array(self.sign_folders).shape[0], activation='softmax') # Layer that contains all possible outputs
             ])
         elif (model_name == "LSTM"):
@@ -228,8 +228,6 @@ class ModelCreator():
             num_of_splits -- number of splits for data during k-fold cross validation. Also specifies a number how many times cross validation will be performed with different set of validation data sets.\n
             num_of_epochs -- number of epochs for Machine Learning process.\n
         """
-        
-        self.model = self.create_model(model_name)
 
         early_stop = EarlyStopping(
             monitor=value_to_monitor,
@@ -242,28 +240,42 @@ class ModelCreator():
             start_from_epoch=starting_epoch
         )
 
-        self.model.compile(optimizer=optimizer_name, loss='categorical_crossentropy', metrics=['categorical_accuracy', Precision(), Recall(), F1Score(average="weighted"), AUC()])
-
-        self.model.summary()
 
         kfold = KFold(n_splits=num_of_splits, shuffle=True)
+        k_fold_num = 0
 
         for train, test in kfold.split(self.X_data, self.Y_data):
-            self.model.fit(self.X_data[train], self.Y_data[train], epochs=num_of_epochs, callbacks=[early_stop])
-            self.history = self.model.evaluate(self.X_data[test], self.Y_data[test], return_dict=True)
-            accuracy_score = self.history['categorical_accuracy']
-            precision_score = self.history['precision']
-            recall_score = self.history['recall']
-            f1score_score = self.history['f1_score']
-            auc_score = self.history['auc']
+            self.model = self.create_model(model_name)
+            self.model.compile(optimizer=optimizer_name, loss='categorical_crossentropy', metrics=['categorical_accuracy', Precision(), Recall(), F1Score(average="weighted"), AUC()])
 
-            headers = ["Accuracy", "Precision", "Recall", "F1", "AUC ROC", "Date"]
+            self.model.fit(self.X_data[train], self.Y_data[train], epochs=num_of_epochs, callbacks=[early_stop])
+
+            self.history = self.model.evaluate(self.X_data[test], self.Y_data[test], return_dict=True)
+
+            if k_fold_num == 0:
+                accuracy_score = self.history['categorical_accuracy']
+                loss_score = self.history['loss']
+                precision_score = self.history['precision']
+                recall_score = self.history['recall']
+                f1score_score = self.history['f1_score']
+                auc_score = self.history['auc']
+            else:
+                accuracy_score = self.history['categorical_accuracy']
+                loss_score = self.history['loss']
+                precision_score = self.history['precision_{}'.format(k_fold_num)]
+                recall_score = self.history['recall_{}'.format(k_fold_num)]
+                f1score_score = self.history['f1_score']
+                auc_score = self.history['auc_{}'.format(k_fold_num)]
+
+            headers = ["Accuracy", "Loss", "Precision", "Recall", "F1", "AUC ROC", "Date"]
 
             with open('ML_Results_{}.csv'.format(model_name), 'a') as file:
                 writer = csv.DictWriter(file, fieldnames=headers)
                 if os.stat('ML_Results_{}.csv'.format(model_name)).st_size == 0:
                     writer.writeheader()
-                writer.writerows([{'Accuracy': accuracy_score, 'Precision': precision_score, 'Recall': recall_score, 'F1': f1score_score, 'AUC ROC': auc_score, 'Date': datetime.now()}])
+                writer.writerows([{'Accuracy': accuracy_score, 'Loss': loss_score, 'Precision': precision_score, 'Recall': recall_score, 'F1': f1score_score, 'AUC ROC': auc_score, 'Date': datetime.now()}])
+
+            k_fold_num += 1
 
     def count_files(self, directory) -> int:
         total_file_amount = 0
