@@ -211,6 +211,8 @@ class RecognitionVisualization(ft.UserControl):
                 words = self.text_field.value.split( )
                 self.text_field.value = " ".join(words[1:])
                 self.text_field.update()
+        else:
+            self.text_field.update()
 
     def update_icon_row(self, hand_results, face_results):
         # Draw face landmarks, if any
