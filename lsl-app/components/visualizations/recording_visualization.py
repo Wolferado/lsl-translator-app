@@ -134,7 +134,7 @@ class RecordingVisualization(ft.UserControl):
         self.update()
 
         self.update_file_count_label()
-
+    
     def start_recording(self, e):
         """Method to start video recording on button click."""
 
@@ -156,6 +156,8 @@ class RecordingVisualization(ft.UserControl):
 
         self.recording_started = False
         self.out.release()
+
+        self.max_frame_amount = 30
 
         self.update()
 
@@ -179,7 +181,6 @@ class RecordingVisualization(ft.UserControl):
                     self.max_frame_amount -= 1
                 elif (self.recording_started == True and self.max_frame_amount <= 0):
                     self.stop_recording()
-                    self.max_frame_amount = 30
 
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 image.flags.writeable = False # Disables any modifications of the 2D array

@@ -246,7 +246,7 @@ class ModelCreator():
 
         for train, test in kfold.split(self.X_data, self.Y_data):
             self.model = self.create_model(model_name)
-            self.model.compile(optimizer=optimizer_name, loss='categorical_crossentropy', metrics=['categorical_accuracy', Precision(), Recall(), F1Score(average="weighted"), AUC()])
+            self.model.compile(optimizer=optimizer_name, loss='categorical_crossentropy', metrics=['categorical_accuracy', Precision(), Recall(), F1Score(average="weighted")])
 
             self.model.fit(self.X_data[train], self.Y_data[train], epochs=num_of_epochs, callbacks=[early_stop])
 
@@ -258,22 +258,20 @@ class ModelCreator():
                 precision_score = self.history['precision']
                 recall_score = self.history['recall']
                 f1score_score = self.history['f1_score']
-                auc_score = self.history['auc']
             else:
                 accuracy_score = self.history['categorical_accuracy']
                 loss_score = self.history['loss']
                 precision_score = self.history['precision_{}'.format(k_fold_num)]
                 recall_score = self.history['recall_{}'.format(k_fold_num)]
                 f1score_score = self.history['f1_score']
-                auc_score = self.history['auc_{}'.format(k_fold_num)]
 
-            headers = ["Accuracy", "Loss", "Precision", "Recall", "F1", "AUC ROC", "Date"]
+            headers = ["Accuracy", "Loss", "Precision", "Recall", "F1", "Date"]
 
             with open('ML_Results_{}.csv'.format(model_name), 'a') as file:
                 writer = csv.DictWriter(file, fieldnames=headers)
                 if os.stat('ML_Results_{}.csv'.format(model_name)).st_size == 0:
                     writer.writeheader()
-                writer.writerows([{'Accuracy': accuracy_score, 'Loss': loss_score, 'Precision': precision_score, 'Recall': recall_score, 'F1': f1score_score, 'AUC ROC': auc_score, 'Date': datetime.now()}])
+                writer.writerows([{'Accuracy': accuracy_score, 'Loss': loss_score, 'Precision': precision_score, 'Recall': recall_score, 'F1': f1score_score, 'Date': datetime.now()}])
 
             k_fold_num += 1
 

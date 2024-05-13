@@ -33,7 +33,7 @@ class RecognitionVisualization(ft.UserControl):
         self.face_detected_icon = ft.Icon(name=ft.icons.TAG_FACES_OUTLINED, color=ft.colors.GREY)
         self.right_hand_detected_icon = ft.Icon(name=ft.icons.FRONT_HAND_OUTLINED, color=ft.colors.GREY)
         
-        self.model_threshold = 0.80
+        self.model_threshold = 0.60
 
         self.icon_row = ft.Row(
             controls=[self.left_hand_detected_icon, self.face_detected_icon, self.right_hand_detected_icon]
