@@ -36,21 +36,20 @@ class ModelCreator():
         # Extract data from materials in the directory
         self.get_data_from_directory()
 
-        # Test size
-        # self.test_size = 0.35
+        # Model compile, saving it and its graphs
+        self.model_compile(model_name="RNN", value_to_monitor="val_loss", min_delta_value=0.1, mode_option="min", starting_epoch=110, optimizer_name="adam", num_of_epochs=150)
+        self.save_model_and_graphs("RNN")
 
-        # self.model_compile(model_name="RNN", value_to_monitor="val_loss", min_delta_value=0.1, mode_option="min", starting_epoch=110, optimizer_name="adam", num_of_epochs=150)
-        # self.save_model_and_graphs("RNN")
+        self.model_compile(model_name="LSTM", value_to_monitor="val_loss", min_delta_value=0.1, mode_option="min", starting_epoch=130, optimizer_name="adam", num_of_epochs=200)
+        self.save_model_and_graphs("LSTM")
 
-        # self.model_compile(model_name="LSTM", value_to_monitor="val_loss", min_delta_value=0.1, mode_option="min", starting_epoch=60, optimizer_name="adam", num_of_epochs=200)
-        # self.save_model_and_graphs("LSTM")
+        self.model_compile(model_name="GRU", value_to_monitor="val_loss", min_delta_value=0.1, mode_option="min", starting_epoch=120, optimizer_name="adam", num_of_epochs=175)
+        self.save_model_and_graphs("GRU")
 
-        # self.model_compile(model_name="GRU", value_to_monitor="val_loss", min_delta_value=0.1, mode_option="min", starting_epoch=50, optimizer_name="adam", num_of_epochs=175)
-        # self.save_model_and_graphs("GRU")
-
+        # K-fold cross validation
         # self.k_fold_cross_validation(model_name="RNN", value_to_monitor="loss", min_delta_value=0.3, mode_option="min", starting_epoch=110, optimizer_name="adam", num_of_splits=5, num_of_epochs=150)
-        # self.k_fold_cross_validation(model_name="LSTM", value_to_monitor="loss", min_delta_value=0.3, mode_option="min", starting_epoch=60, optimizer_name="adam", num_of_splits=5, num_of_epochs=200)
-        # self.k_fold_cross_validation(model_name="GRU", value_to_monitor="loss", min_delta_value=0.3, mode_option="min", starting_epoch=50, optimizer_name="adam", num_of_splits=5, num_of_epochs=175)
+        # self.k_fold_cross_validation(model_name="LSTM", value_to_monitor="loss", min_delta_value=0.3, mode_option="min", starting_epoch=130, optimizer_name="adam", num_of_splits=5, num_of_epochs=200)
+        # self.k_fold_cross_validation(model_name="GRU", value_to_monitor="loss", min_delta_value=0.3, mode_option="min", starting_epoch=120, optimizer_name="adam", num_of_splits=5, num_of_epochs=175)
 
     def get_data_from_directory(self):
         signs_labels_enum = {label:num for num, label in enumerate(self.sign_folders)}

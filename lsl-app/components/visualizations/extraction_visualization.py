@@ -64,9 +64,9 @@ class ExtractionVisualization(ft.UserControl):
                 mp_drawing.draw_landmarks(
                     image = image, 
                     landmark_list = hand, 
-                    connections = mp_hands.HAND_CONNECTIONS, # Draw landmarks and their connections based on image, hand shown 
-                    landmark_drawing_spec = mp_drawing.DrawingSpec(color=(0, 0, 0), thickness=1, circle_radius=1), # Customize landmarks
-                    connection_drawing_spec = mp_drawing.DrawingSpec(color=(255, 0, 0), thickness=1, circle_radius=1) # Customize connections
+                    connections = mp_hands.HAND_CONNECTIONS, 
+                    landmark_drawing_spec = mp_drawing.DrawingSpec(color=(0, 0, 0), thickness=1, circle_radius=1),
+                    connection_drawing_spec = mp_drawing.DrawingSpec(color=(255, 0, 0), thickness=1, circle_radius=1)
                 ) 
 
     def extract_results_landmarks(self, hand_results, face_results):
@@ -239,8 +239,10 @@ class ExtractionVisualization(ft.UserControl):
                 if(os.path.isdir(data_path) == False): # If path doesn't exist
                     os.mkdir(data_path) # Create it
 
+                # Process the video
                 self.process_video(folder_name=folder, file_path=file_path, data_path=data_path, current_file_index=current_file, file_amount_num=file_amount)
             
+        # Play a notification sound once extraction process is finished    
         winsound.MessageBeep(type=winsound.MB_ICONASTERISK) 
                 
     def process_files_no_new_folders(self):
@@ -253,20 +255,23 @@ class ExtractionVisualization(ft.UserControl):
 
         # For each file in the directory
         for file in os.listdir(self.extraction_directory):
-            current_file += 1
-            file_path = "{}/{}".format(self.extraction_directory, file)
-            self.cap = cv2.VideoCapture(filename=file_path)
+            current_file += 1 # Increment the counter
+            file_path = "{}/{}".format(self.extraction_directory, file) # Get a path for next file
+            self.cap = cv2.VideoCapture(filename=file_path) # Play the file by using OpenCV
             
-            data_path = self.saving_directory
+            data_path = self.saving_directory # Get a path for saving
 
+            # Process the video
             self.process_video(folder_name=file.rsplit('.')[0], file_path=file_path, data_path=data_path, current_file_index=current_file, file_amount_num=file_amount)
 
+        # Play notification sound once extraction process is finished
         winsound.MessageBeep(type=winsound.MB_ICONASTERISK)
             
     def process_video(self, folder_name: str, file_path: str, data_path: str, current_file_index: int, file_amount_num: int):
         # Create a mask for the hands and face via MediaPipe libraries
         with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.55, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.65, max_num_faces=1) as face_mesh:
             current_frame = 0 
+
             while True:
                 orig_path = "{}/{}".format(data_path, current_frame)
                 if(os.path.isdir(orig_path) == False):
@@ -345,7 +350,7 @@ class ExtractionVisualization(ft.UserControl):
 
             self.draw_landmarks(image, hand_results, face_results) # Draw landmarks on visualization
 
-            if ret == True: # If video still has more frames
+            if ret == True: # If video still has more frames, convert them to Base64 format (for Flet library usage)
                 ret, image_arr = cv2.imencode(".png", image)
                 image_b64 = base64.b64encode(image_arr)
                 self.image.src_base64 = image_b64.decode("utf-8")
