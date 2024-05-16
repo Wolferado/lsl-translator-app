@@ -50,7 +50,7 @@ class RecognitionVisualization(ft.UserControl):
         )
 
         self.dropdown_menu = ft.Dropdown(
-            value="LSTM",
+            value="RNN",
             autofocus=False,
             text_size=16,
             width=150,
@@ -130,7 +130,7 @@ class RecognitionVisualization(ft.UserControl):
                 image.flags.writeable = True # Allows any modifications of the 2D array
                 image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-                # self.draw_landmarks(image, hand_results, face_results)
+                # self.draw_landmarks(image, hand_results, face_results) # Disable once experimentation is finished
                 self.process_landmarks(hand_results, face_results)
                 self.update_icon_row(hand_results, face_results)
 
@@ -163,13 +163,13 @@ class RecognitionVisualization(ft.UserControl):
 
         self.sequence.append(self.extract_landmarks(hand_results, face_results)) # Append extracted landmark information to the sequence
 
-        if(len(self.sequence) >= 35): # If sequence contains information about 35 frames and more
-            result = self.model.predict(np.expand_dims(self.sequence[-30:], axis=0))[0] # Get result by parsing expanded sequence array 
-            print(np.expand_dims(self.sequence, axis=0).shape) # (1, 30, 672)
-            print(np.array(self.sequence).shape) # (30, 672)
+        if(len(self.sequence) >= 40): # If sequence contains information about 40 frames and more
+            result = self.model.predict(np.expand_dims(self.sequence[-30:], axis=0))[0] # Get result by parsing expanded sequence array (only last 30 frames)
+            print(np.expand_dims(self.sequence, axis=0).shape)
+            print(np.array(self.sequence).shape) 
 
             if (signs[np.argmax(result)] == "_"): # Don't add threshold, if it is blank symbol
-                print("Prob: {}, symbol #{} - {}".format(result[np.argmax(result)], result.argmax(axis=-1), signs[np.argmax(result)]))
+                print("Prob: {}, symbol #{} - {}".format(round(float(result[np.argmax(result)]), 3), result.argmax(axis=-1), signs_lib[signs[np.argmax(result)]]))
                 if(len(self.text_field.value) == 0 or (self.text_field.value[-2:] == ". " and len(self.text_field.value) > 1)):
                     pass
                 elif(self.text_field.value[-1:] != "_"): # For continuation
@@ -179,35 +179,36 @@ class RecognitionVisualization(ft.UserControl):
                 elif(self.text_field.value[-1:] == "_"):
                     self.text_field.value = self.text_field.value[:-1] + '. '
 
-                # self.text_field.update()
-                self.sequence = []
+                self.sequence.clear()
                 self.repeated_recognition_times = 0
                 self.cleanup_textfield()
             elif (result[np.argmax(result)] >= self.model_threshold): # If letters exceed needed threshold, output it
-                print("Prob: {}, symbol #{} - {}".format(result[np.argmax(result)], result.argmax(axis=-1), signs_lib[signs[np.argmax(result)]]))
+                print("Prob: {}, symbol #{} - {}".format(round(float(result[np.argmax(result)]), 3), result.argmax(axis=-1), signs_lib[signs[np.argmax(result)]]))
                 if (self.text_field.value[-1:] == "_"):
                     self.text_field.value = self.text_field.value[:-1]
                 
                 if (len(signs_lib[signs[np.argmax(result)]]) == 1):
                     self.text_field.value = self.text_field.value + "{}".format(signs_lib[signs[np.argmax(result)]])
+                elif (len(signs_lib[signs[np.argmax(result)]]) > 1 and (self.text_field.value[-1:] == " " or self.text_field.value[-1:] == "_" or len(self.text_field.value) == 0)):
+                    self.text_field.value = self.text_field.value + "{} ".format(signs_lib[signs[np.argmax(result)]])
                 else:
                     self.text_field.value = self.text_field.value + " {} ".format(signs_lib[signs[np.argmax(result)]])
 
-                # self.text_field.update()
-                self.sequence = []
+                self.sequence.clear()
                 self.repeated_recognition_times = 0
                 self.cleanup_textfield()
             elif (result[np.argmax(result)] < self.model_threshold and self.repeated_recognition_times < 5): # Repeat for 5 times to be sure
                 self.repeated_recognition_times += 1
-                print("Repeat")
             else: # Otherwise output notification about insufficient probability
-                print("Prob: {}, symbol #{} - {}. (low prob., no display).".format(result[np.argmax(result)], result.argmax(axis=-1), signs[np.argmax(result)]))
-                self.sequence = []
+                print("Prob: {}, symbol #{} - {}. (low prob., no display).".format(round(float(result[np.argmax(result)]), 3), result.argmax(axis=-1), signs_lib[signs[np.argmax(result)]]))
+                self.sequence.clear()
                 self.repeated_recognition_times = 0
 
     def cleanup_textfield(self):
-        if(len(self.text_field.value) > 45):
-            while(len(self.text_field.value) > 40):
+        """Method to clean up textfield value."""
+
+        if(len(self.text_field.value) > 50):
+            while(len(self.text_field.value) > 45):
                 words = self.text_field.value.split( )
                 self.text_field.value = " ".join(words[1:])
                 self.text_field.update()
@@ -215,6 +216,8 @@ class RecognitionVisualization(ft.UserControl):
             self.text_field.update()
 
     def update_icon_row(self, hand_results, face_results):
+        """Method to update icon row based on the detected face and hands, for user information."""
+
         # Draw face landmarks, if any
         if face_results.multi_face_landmarks:
             self.face_detected_icon.color = ft.colors.GREEN_ACCENT_700 # Set icon color to green
@@ -259,6 +262,7 @@ class RecognitionVisualization(ft.UserControl):
         face_results -- results of MediaPipe FaceMesh model processing.
         """
 
+        # Draw face landmarks, if any
         if face_results.multi_face_landmarks:
             for face in face_results.multi_face_landmarks:
                 self.face_detected_icon.color = ft.colors.GREEN_ACCENT_700 # Set icon color to green
@@ -278,8 +282,8 @@ class RecognitionVisualization(ft.UserControl):
                     image = image, 
                     landmark_list = hand, 
                     connections = mp_hands.HAND_CONNECTIONS, # Draw landmarks and their connections based on image, hand shown 
-                    landmark_drawing_spec = mp_drawing.DrawingSpec(color=(0, 0, 0), thickness=2, circle_radius=2), # Customize landmarks
-                    connection_drawing_spec = mp_drawing.DrawingSpec(color=(255, 0, 255), thickness=2, circle_radius=2) # Customize connections
+                    landmark_drawing_spec = mp_drawing.DrawingSpec(color=(0, 0, 0), thickness=2, circle_radius=2),
+                    connection_drawing_spec = mp_drawing.DrawingSpec(color=(255, 0, 255), thickness=2, circle_radius=2)
                 ) 
 
     def extract_landmarks(self, hand_results, face_results):
