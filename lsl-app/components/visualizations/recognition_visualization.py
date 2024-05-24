@@ -1,18 +1,18 @@
+# Libraries and dependencies
 import threading
-import flet as ft # GUI library
-import mediapipe as mp # Library for hand detection
-import cv2 # Library for camera manipulations
-import base64 # For conversion
-import keras # For model methods
-import os # To access model file
-import joblib
+import flet as ft 
+import mediapipe as mp 
+import cv2 
+import base64 
+import keras 
+import os 
 import numpy as np
 
 from components.symbol_library import signs_lib
 
-mp_hands = mp.solutions.hands # Load the solution from mediapipe library
-mp_face_mesh = mp.solutions.face_mesh # Load the solution from mediapipe library
-mp_drawing = mp.solutions.drawing_utils # Enabling drawing utilities from MediaPipe library
+mp_hands = mp.solutions.hands 
+mp_face_mesh = mp.solutions.face_mesh 
+mp_drawing = mp.solutions.drawing_utils 
 mp_drawing_styles = mp.solutions.drawing_styles
 
 signs = list(signs_lib.keys())
@@ -111,6 +111,7 @@ class RecognitionVisualization(ft.UserControl):
         self.clear_textfield()
 
     def clear_textfield(self, e=None):
+        """Method to clear the whole text field."""
         self.text_field.value = ""
         self.text_field.update()
 
@@ -205,7 +206,7 @@ class RecognitionVisualization(ft.UserControl):
                 self.repeated_recognition_times = 0
 
     def cleanup_textfield(self):
-        """Method to clean up textfield value."""
+        """Method to clean up textfield value by deleting words in the beggining."""
 
         if(len(self.text_field.value) > 50):
             while(len(self.text_field.value) > 45):

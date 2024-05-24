@@ -1,14 +1,15 @@
+# Libraries and dependencies
 import threading
-import flet as ft # GUI library
-import mediapipe as mp # Library for hand detection
-import cv2 # Library for camera manipulations
-import base64 # For conversion
+import flet as ft
+import mediapipe as mp 
+import cv2 
+import base64 
 import os
-import winsound # For notification sound
+import winsound 
 
-mp_hands = mp.solutions.hands # Load the solution from mediapipe library
-mp_face_mesh = mp.solutions.face_mesh # Load the solution from mediapipe library
-mp_drawing = mp.solutions.drawing_utils # Enabling drawing utilities from MediaPipe library
+mp_hands = mp.solutions.hands 
+mp_face_mesh = mp.solutions.face_mesh
+mp_drawing = mp.solutions.drawing_utils 
 mp_drawing_styles = mp.solutions.drawing_styles
 
 class RecordingVisualization(ft.UserControl):
@@ -34,14 +35,6 @@ class RecordingVisualization(ft.UserControl):
         self.file_count_label = ft.Text(
             value="No directory selected.",
             size=14
-        )
-
-        self.take_picture_btn = ft.ElevatedButton(
-            text="Take a picture",
-            icon=ft.icons.CAMERA_ALT_OUTLINED,
-            disabled=True,
-            visible=True,
-            on_click=self.take_picture
         )
 
         self.blur_checkbox = ft.Checkbox(
@@ -81,7 +74,6 @@ class RecordingVisualization(ft.UserControl):
                 self.file_count_label,
                 self.get_saving_directory_dialog,
                 self.blur_checkbox,
-                #self.take_picture_btn,
                 self.start_recording_btn,
                 self.stop_recording_btn,
                 self.camera_placeholder
@@ -114,26 +106,15 @@ class RecordingVisualization(ft.UserControl):
         self.update_file_count_label()
 
     def enable_disable_control_btn(self):
+        """Method to toggle GUI elements for video capture."""
         if self.saving_directory:
-            self.take_picture_btn.disabled = False
             self.start_recording_btn.disabled = False
         else:
-            self.take_picture_btn.disabled = True
             self.start_recording_btn.disabled = True
 
     def toggle_blur_checkbox(self, e):
+        """Method to toggle blur filter for the video stream."""
         self.blur_enabled = not self.blur_enabled
-
-    def take_picture(self, e):
-        """Method to create a picture on button click."""
-
-        print("Picture taken")
-
-        cv2.imwrite("{}/{}.jpg".format(self.saving_directory, self.count_files()), self.original_image)
-
-        self.update()
-
-        self.update_file_count_label()
     
     def start_recording(self, e):
         """Method to start video recording on button click."""
@@ -173,7 +154,7 @@ class RecordingVisualization(ft.UserControl):
                 if(self.blur_enabled):
                     image = cv2.blur(image, (15, 15))
 
-                image = cv2.flip(image, 1) # Flip the stream
+                image = cv2.flip(image, 1) 
                 self.original_image = image
 
                 if(self.recording_started == True and self.max_frame_amount > 0):
@@ -183,15 +164,14 @@ class RecordingVisualization(ft.UserControl):
                     self.stop_recording()
 
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                image.flags.writeable = False # Disables any modifications of the 2D array
+                image.flags.writeable = False 
                 hand_results = hands.process(image) 
                 face_results = face_mesh.process(image)
-                image.flags.writeable = True # Allows any modifications of the 2D array
+                image.flags.writeable = True 
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
                 self.draw_landmarks(image, hand_results, face_results)
 
-                # Open a window with the app
                 ret, image_arr = cv2.imencode(".png", image)
                 image_b64 = base64.b64encode(image_arr)
                 self.image.src_base64 = image_b64.decode("utf-8")
@@ -206,6 +186,7 @@ class RecordingVisualization(ft.UserControl):
         face_results -- results of MediaPipe FaceMesh model processing.
         """
 
+        # If face detected
         if face_results.multi_face_landmarks:
             for face in face_results.multi_face_landmarks:
                 mp_drawing.draw_landmarks(
@@ -216,15 +197,15 @@ class RecordingVisualization(ft.UserControl):
                     connection_drawing_spec = mp_drawing_styles.DrawingSpec(color=(0, 0, 255), thickness=1, circle_radius=1)
                 )
 
-        # Draw hand landmarks, if any
+        # If hands detected
         if hand_results.multi_hand_landmarks:
             for hand in hand_results.multi_hand_landmarks:
                 mp_drawing.draw_landmarks(
                     image = image, 
                     landmark_list = hand, 
-                    connections = mp_hands.HAND_CONNECTIONS, # Draw landmarks and their connections based on image, hand shown 
-                    landmark_drawing_spec = mp_drawing.DrawingSpec(color=(0, 0, 0), thickness=1, circle_radius=1), # Customize landmarks
-                    connection_drawing_spec = mp_drawing.DrawingSpec(color=(255, 0, 255), thickness=2, circle_radius=2) # Customize connections
+                    connections = mp_hands.HAND_CONNECTIONS,
+                    landmark_drawing_spec = mp_drawing.DrawingSpec(color=(0, 0, 0), thickness=1, circle_radius=1),
+                    connection_drawing_spec = mp_drawing.DrawingSpec(color=(255, 0, 255), thickness=2, circle_radius=2) 
                 ) 
 
     def update_file_count_label(self):

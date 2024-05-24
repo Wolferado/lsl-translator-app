@@ -1,3 +1,4 @@
+# Libraries and dependencies
 from sklearn.model_selection import train_test_split
 from keras.utils import to_categorical
 from keras.callbacks import EarlyStopping
@@ -21,10 +22,10 @@ class ModelCreator():
     def __init__(self):
         self.directory = os.path.join(os.curdir, "sign_data_full_collection")
         self.signs_to_learn = list(signs_lib.keys())
-        self.sign_folders = os.listdir(self.directory) # All folders
+        self.sign_folders = os.listdir(self.directory) 
         self.max_frame_amount = 30
-        self.face_points_amount = 366 # 1404 - whole face, 366 - limited face
-        self.hand_points_amount = 108 # 63 - not traceable, 153 - traceable (6 points), 108 traceable (3 points)
+        self.face_points_amount = 366 
+        self.hand_points_amount = 108 
         self.X_data = None
         self.Y_data = None
         self.test_size = 0.35
@@ -108,25 +109,25 @@ class ModelCreator():
                 SimpleRNN(48, return_sequences=True, activation='relu'),
                 GaussianNoise(0.15),
                 SimpleRNN(32, return_sequences=False, activation='relu'),
-                Dense(np.array(self.sign_folders).shape[0], activation='softmax') # Layer that contains all possible outputs
+                Dense(np.array(self.sign_folders).shape[0], activation='softmax') 
             ])
         elif (model_name == "LSTM"):
             model = Sequential([
-                Input(shape=(self.max_frame_amount, (self.face_points_amount + 2 * self.hand_points_amount))), # 1530 - non-traceable, 1710 - traceable
+                Input(shape=(self.max_frame_amount, (self.face_points_amount + 2 * self.hand_points_amount))), 
                 LSTM(128, return_sequences=True, activation='sigmoid'),
                 GaussianNoise(0.2),
                 LSTM(128, return_sequences=True, activation='sigmoid'),
                 Dropout(0.2),
                 LSTM(128, return_sequences=False, activation='sigmoid'),
-                Dense(np.array(self.sign_folders).shape[0], activation='softmax') # Layer that contains all possible outputs
+                Dense(np.array(self.sign_folders).shape[0], activation='softmax') 
             ])
         elif (model_name == "GRU"):
             model = Sequential([
-                Input(shape=(self.max_frame_amount, (self.face_points_amount + 2 * self.hand_points_amount))), # 1530 - non-traceable, 1710 - traceable
+                Input(shape=(self.max_frame_amount, (self.face_points_amount + 2 * self.hand_points_amount))), 
                 GRU(128, return_sequences=True, activation='sigmoid'),
                 GaussianNoise(0.25),
                 GRU(128, return_sequences=False, activation='sigmoid'),
-                Dense(np.array(self.sign_folders).shape[0], activation='softmax') # Layer that contains all possible outputs
+                Dense(np.array(self.sign_folders).shape[0], activation='softmax') 
             ])
         else:
             exception_msg = "There is no types of ML models for '{}'. Check definition and try again.".format(model_name)

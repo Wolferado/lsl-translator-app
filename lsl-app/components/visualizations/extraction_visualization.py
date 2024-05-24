@@ -1,15 +1,16 @@
-import flet as ft
-import mediapipe as mp # Library for hand detection
-import numpy as np # Library for math
-import cv2 # Library for camera manipulations
+# Libraries and dependencies
+import flet as ft 
+import mediapipe as mp 
+import numpy as np 
+import cv2 
 import threading
-import os # Library for operating with the system
-import base64 # For conversion
-import winsound # For notification sound
+import os 
+import base64 
+import winsound 
 
-mp_hands = mp.solutions.hands # Load the solution from mediapipe library
-mp_face_mesh = mp.solutions.face_mesh # Load the solution from mediapipe library
-mp_drawing = mp.solutions.drawing_utils # Enabling drawing utilities from MediaPipe library
+mp_hands = mp.solutions.hands 
+mp_face_mesh = mp.solutions.face_mesh 
+mp_drawing = mp.solutions.drawing_utils 
 mp_drawing_styles = mp.solutions.drawing_styles
 
 class ExtractionVisualization(ft.UserControl):
@@ -268,6 +269,15 @@ class ExtractionVisualization(ft.UserControl):
         winsound.MessageBeep(type=winsound.MB_ICONASTERISK)
             
     def process_video(self, folder_name: str, file_path: str, data_path: str, current_file_index: int, file_amount_num: int):
+        """Method to process the video. Extracts data from every frame of the video.
+
+        Keyword arguments:\n
+        folder_name -- name of the folder, where file is located.\n
+        file_path -- path of the file.\n
+        data_path -- path where to store extracted data.\n
+        current_file_index -- index of the file processing in order.\n
+        file_amount_num -- total amount of the files in the folder.
+        """
         # Create a mask for the hands and face via MediaPipe libraries
         with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.55, max_num_hands=2) as hands, mp_face_mesh.FaceMesh(min_detection_confidence=0.65, max_num_faces=1) as face_mesh:
             current_frame = 0 
@@ -332,7 +342,7 @@ class ExtractionVisualization(ft.UserControl):
             elif original_data_path: # If video is supposed to be original (exists path to save the original video)
                 cv2.putText(image, "{} - Original Video, {} of {}".format(folder_name, file_number, files_amount), (10,30), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 2)
 
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # Convert image to BGR for better face and hand tracking
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # Convert image to RGB for better face and hand tracking
             image.flags.writeable = False # Disable any modifications of the 2D array
             hand_results = hands_model.process(image) # Get data about hands landmarks
             face_results = face_mesh_model.process(image) # Get data about face landmarks

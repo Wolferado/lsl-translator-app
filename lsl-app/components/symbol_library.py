@@ -1,3 +1,4 @@
+# This is an array of all those folders that contain video data for signs. Change it once more data is added with its own sign meaning in alphabetical order.
 signs_lib = {
     'a': 'a',
     'abols': 'ābols',
