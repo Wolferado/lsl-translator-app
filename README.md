@@ -26,6 +26,10 @@ Machine learning models are created with Keras library and use following algorit
 - LSTM (Long-Short Term Memory);
 - GRU (Gated Recurrent Unit).
 
+## Showcase
+
+![GIF of showcasing the functionality of the app](/materials/LSL%20-%2010%20sec.gif)
+
 ## Machine Learning models statistics
 
 ### RNN 5-fold Cross-Validation
