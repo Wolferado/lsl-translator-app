@@ -1,5 +1,8 @@
 # Latvian Sign Language Translator App
 
+> [!WARNING]
+> This project has been archived due to it being presented and evaluated.
+
 > [!IMPORTANT]
 > This app is developed for this author bachelor's thesis on “Real-time computer vision solution for Latvian sign language recognition”.
 
